@@ -1,0 +1,178 @@
+package `in`.ragv.onlinegallery.ui.viewmodel
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import `in`.ragv.onlinegallery.data.auth.AuthManager
+import `in`.ragv.onlinegallery.data.models.Album
+import `in`.ragv.onlinegallery.data.repository.OneDriveRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+data class DeviceCodeData(
+    val userCode: String,
+    val verificationUrl: String,
+    val deviceCode: String,
+    val interval: Int
+)
+
+data class AlbumUiState(
+    val albums: List<Album> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val isAuthenticated: Boolean = false,
+    val deviceCodeData: DeviceCodeData? = null,
+    val isAuthenticating: Boolean = false
+)
+
+class AlbumViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = OneDriveRepository(application)
+
+    private val _uiState = MutableStateFlow(AlbumUiState())
+    val uiState: StateFlow<AlbumUiState> = _uiState.asStateFlow()
+
+    init {
+        initialize()
+    }
+
+    private fun initialize() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val initialized = repository.initialize()
+                val isAuth = repository.isAuthenticated()
+                _uiState.value = _uiState.value.copy(
+                    isAuthenticated = isAuth,
+                    isLoading = false
+                )
+                if (isAuth && initialized) {
+                    loadAlbums()
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message
+                )
+            }
+        }
+    }
+
+    /**
+     * Start the sign-in process
+     * This initiates the device code flow
+     */
+    fun signIn() {
+        android.util.Log.d("AlbumViewModel", "signIn() called")
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            android.util.Log.d("AlbumViewModel", "Starting sign-in, isLoading=true")
+            try {
+                val result = repository.startSignIn()
+                android.util.Log.d("AlbumViewModel", "startSignIn result: ${result.isSuccess}")
+                if (result.isSuccess) {
+                    val info = result.getOrNull()!!
+                    android.util.Log.d("AlbumViewModel", "Device code: ${info.userCode}, URL: ${info.verificationUrl}")
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        deviceCodeData = DeviceCodeData(
+                            userCode = info.userCode,
+                            verificationUrl = info.verificationUrl,
+                            deviceCode = info.deviceCode,
+                            interval = info.interval
+                        ),
+                        isAuthenticating = true
+                    )
+                    // Start polling for completion
+                    pollForAuthentication(info.deviceCode, info.interval)
+                } else {
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Failed to start sign-in"
+                    android.util.Log.e("AlbumViewModel", "Sign-in failed: $errorMsg", result.exceptionOrNull())
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = errorMsg
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AlbumViewModel", "Exception during sign-in", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Unknown error occurred"
+                )
+            }
+        }
+    }
+
+    /**
+     * Poll for authentication completion
+     */
+    private fun pollForAuthentication(deviceCode: String, interval: Int) {
+        viewModelScope.launch {
+            try {
+                val result = repository.completeSignIn(deviceCode, interval)
+                if (result.isSuccess) {
+                    _uiState.value = _uiState.value.copy(
+                        isAuthenticated = true,
+                        isAuthenticating = false,
+                        deviceCodeData = null
+                    )
+                    // Initialize repository and load albums
+                    repository.initialize()
+                    loadAlbums()
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isAuthenticating = false,
+                        deviceCodeData = null,
+                        error = result.exceptionOrNull()?.message ?: "Authentication failed"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isAuthenticating = false,
+                    deviceCodeData = null,
+                    error = e.message
+                )
+            }
+        }
+    }
+
+    /**
+     * Load albums from OneDrive
+     */
+    fun loadAlbums() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                val albums = repository.getAlbums()
+                _uiState.value = _uiState.value.copy(
+                    albums = albums,
+                    isLoading = false
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message
+                )
+            }
+        }
+    }
+
+    /**
+     * Sign out
+     */
+    fun signOut() {
+        viewModelScope.launch {
+            repository.signOut()
+            _uiState.value = AlbumUiState()
+        }
+    }
+
+    /**
+     * Clear error message
+     */
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+}

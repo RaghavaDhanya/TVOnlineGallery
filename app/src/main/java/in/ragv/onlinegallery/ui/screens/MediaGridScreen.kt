@@ -1,0 +1,149 @@
+package `in`.ragv.onlinegallery.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import androidx.tv.material3.*
+import coil.compose.AsyncImage
+import `in`.ragv.onlinegallery.data.models.MediaItem
+import `in`.ragv.onlinegallery.ui.viewmodel.MediaViewModel
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun MediaGridScreen(
+    viewModel: MediaViewModel,
+    albumId: String,
+    albumName: String,
+    onMediaClick: (MediaItem, Int) -> Unit,
+    onBackClick: () -> Unit
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(albumId) {
+        viewModel.loadMediaItems(albumId, albumName)
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            uiState.isLoading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+            uiState.error != null -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Error: ${uiState.error}",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { viewModel.loadMediaItems(albumId, albumName) }) {
+                        Text("Retry")
+                    }
+                }
+            }
+            uiState.mediaItems.isEmpty() -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "No media found in this album",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = onBackClick) {
+                        Text("Go Back")
+                    }
+                }
+            }
+            else -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(48.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(bottom = 32.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(onClick = onBackClick) {
+                            Text("Back")
+                        }
+                        Spacer(modifier = Modifier.width(24.dp))
+                        Text(
+                            text = uiState.albumName,
+                            style = MaterialTheme.typography.displayMedium
+                        )
+                    }
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        itemsIndexed(uiState.mediaItems) { index, item ->
+                            MediaCard(
+                                mediaItem = item,
+                                onClick = { onMediaClick(item, index) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun MediaCard(
+    mediaItem: MediaItem,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .aspectRatio(1.33f)
+            .fillMaxWidth()
+    ) {
+        Box {
+            AsyncImage(
+                model = mediaItem.thumbnailUrl ?: mediaItem.url,
+                contentDescription = mediaItem.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            if (mediaItem.isVideo) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(48.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            shape = androidx.compose.foundation.shape.CircleShape
+                        )
+                ) {
+                    Text(
+                        text = "▶",
+                        style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+            }
+        }
+    }
+}
