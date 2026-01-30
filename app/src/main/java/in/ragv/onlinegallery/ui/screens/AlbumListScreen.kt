@@ -71,7 +71,7 @@ fun AlbumListScreen(
                         .padding(48.dp)
                 ) {
                     Text(
-                        text = "My Albums",
+                        text = "Albums",
                         style = MaterialTheme.typography.displayMedium,
                         modifier = Modifier.padding(bottom = 32.dp)
                     )
