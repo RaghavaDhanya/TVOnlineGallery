@@ -71,7 +71,16 @@ class AuthManager(context: Context) {
     fun isAuthenticated(): Boolean {
         val token = prefs.getString(KEY_ACCESS_TOKEN, null)
         val expiry = prefs.getLong(KEY_TOKEN_EXPIRY, 0)
-        return !token.isNullOrEmpty() && System.currentTimeMillis() < expiry
+
+        val isValid = !token.isNullOrEmpty() && System.currentTimeMillis() < expiry
+
+        // Debug logging
+        if (!token.isNullOrEmpty()) {
+            val dotCount = token.count { it == '.' }
+            Log.d(TAG, "Token validation - length: ${token.length}, dots: $dotCount, expired: ${System.currentTimeMillis() >= expiry}")
+        }
+
+        return isValid
     }
 
     /**

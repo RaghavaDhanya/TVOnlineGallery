@@ -18,11 +18,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.shape.CircleShape
+import `in`.ragv.onlinegallery.R
 import `in`.ragv.onlinegallery.data.models.MediaItem
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.LibVLC
@@ -43,6 +48,7 @@ fun MediaViewerScreen(
     var isPlaying by remember { mutableStateOf(true) }
     var videoPosition by remember { mutableStateOf(0L) }
     var videoDuration by remember { mutableStateOf(0L) }
+    var mediaPlayerRef by remember { mutableStateOf<Any?>(null) }
 
     // Auto-hide controls after 4 seconds
     LaunchedEffect(showControls, currentIndex) {
@@ -57,31 +63,62 @@ fun MediaViewerScreen(
             .fillMaxSize()
             .focusable()
             .onKeyEvent { keyEvent ->
-                // Handle key events
                 if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            // Navigate to next without showing controls
-                            if (currentIndex < mediaItems.size - 1) {
-                                currentIndex++
+                            if (currentItem.isVideo) {
+                                // For videos: seek forward 10 seconds
+                                (mediaPlayerRef as? MediaPlayer)?.let { player ->
+                                    val newPosition = (player.time + 10000).coerceAtMost(player.length)
+                                    player.time = newPosition
+                                }
+                                showControls = true
                                 true
-                            } else false
+                            } else {
+                                // For images: navigate to next
+                                if (currentIndex < mediaItems.size - 1) {
+                                    currentIndex++
+                                    true
+                                } else false
+                            }
                         }
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            // Navigate to previous without showing controls
-                            if (currentIndex > 0) {
-                                currentIndex--
+                            if (currentItem.isVideo) {
+                                // For videos: seek backward 10 seconds
+                                (mediaPlayerRef as? MediaPlayer)?.let { player ->
+                                    val newPosition = (player.time - 10000).coerceAtLeast(0)
+                                    player.time = newPosition
+                                }
+                                showControls = true
                                 true
-                            } else false
+                            } else {
+                                // For images: navigate to previous
+                                if (currentIndex > 0) {
+                                    currentIndex--
+                                    true
+                                } else false
+                            }
                         }
                         KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                            // Center button toggles controls
-                            showControls = !showControls
-                            true
+                            if (currentItem.isVideo) {
+                                // For videos: toggle play/pause
+                                isPlaying = !isPlaying
+                                showControls = true
+                                true
+                            } else {
+                                // For images: toggle controls
+                                showControls = !showControls
+                                true
+                            }
+                        }
+                        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                            // Up/Down shows controls
+                            showControls = true
+                            false // Let it propagate for focus navigation
                         }
                         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                            // Play/pause button
                             isPlaying = !isPlaying
+                            showControls = true
                             true
                         }
                         KeyEvent.KEYCODE_BACK -> {
@@ -89,14 +126,11 @@ fun MediaViewerScreen(
                             true
                         }
                         else -> {
-                            // Any other button shows controls
                             showControls = true
                             false
                         }
                     }
-                } else {
-                    false
-                }
+                } else false
             }
     ) {
         // Media content
@@ -109,7 +143,8 @@ fun MediaViewerScreen(
                 onPositionUpdate = { position, duration ->
                     videoPosition = position
                     videoDuration = duration
-                }
+                },
+                onMediaPlayerCreated = { mediaPlayerRef = it }
             )
         } else {
             AsyncImage(
@@ -120,7 +155,7 @@ fun MediaViewerScreen(
             )
         }
 
-        // Top gradient overlay for title
+        // Top bar overlay
         AnimatedVisibility(
             visible = showControls,
             enter = fadeIn(),
@@ -133,152 +168,274 @@ fun MediaViewerScreen(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.8f),
+                                Color.Black.copy(alpha = 0.7f),
                                 Color.Transparent
                             )
                         )
                     )
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 48.dp, vertical = 32.dp)
+                        .padding(horizontal = 32.dp, vertical = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    androidx.compose.material3.IconButton(
+                        onClick = { onBackClick() },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.outline_arrow_back_24),
+                            contentDescription = "Back",
+                            modifier = Modifier.size(32.dp),
+                            tint = Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
                     Text(
                         text = currentItem.name,
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "${currentIndex + 1} of ${mediaItems.size}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.9f)
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
         }
 
-        // Bottom gradient overlay for controls
-        AnimatedVisibility(
-            visible = showControls,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.8f)
-                            )
-                        )
-                    )
+        // Center playback controls (for videos)
+        if (currentItem.isVideo) {
+            AnimatedVisibility(
+                visible = showControls,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.Center)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 48.dp, vertical = 32.dp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    // Video progress bar (only for videos)
-                    if (currentItem.isVideo && videoDuration > 0) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Text(
-                                text = formatTime(videoPosition),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White
-                            )
-                            androidx.compose.material3.LinearProgressIndicator(
-                                progress = { videoPosition.toFloat() / videoDuration },
-                                modifier = Modifier.weight(1f),
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = Color.White.copy(alpha = 0.3f)
-                            )
-                            Text(
-                                text = formatTime(videoDuration),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    // Control buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                    // Back button
-                    Button(
-                        onClick = {
-                            onBackClick()
-                        },
-                        modifier = Modifier.width(140.dp)
-                    ) {
-                        Text("← Back")
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // Play/Pause button for videos
-                    if (currentItem.isVideo) {
-                        Button(
-                            onClick = {
-                                isPlaying = !isPlaying
-                            },
-                            modifier = Modifier.width(160.dp)
-                        ) {
-                            Text(if (isPlaying) "Pause" else "Play")
-                        }
-                    }
-
-                    // Navigation hint
-                    Text(
-                        text = "Use ← → to navigate",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.7f)
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
-
                     // Previous button
-                    Button(
+                    androidx.compose.material3.IconButton(
                         onClick = {
                             if (currentIndex > 0) {
                                 currentIndex--
+                                isPlaying = true
                                 showControls = true
                             }
                         },
                         enabled = currentIndex > 0,
-                        modifier = Modifier.width(160.dp)
+                        modifier = Modifier
+                            .size(80.dp)
+                            .background(
+                                color = Color.White.copy(alpha = 0.2f),
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
                     ) {
-                        Text("← Previous")
+                        Icon(
+                            painter = painterResource(R.drawable.baseline_fast_rewind_24),
+                            contentDescription = "Previous",
+                            modifier = Modifier.size(48.dp),
+                            tint = Color.White
+                        )
+                    }
+
+                    // Play/Pause button (larger)
+                    androidx.compose.material3.IconButton(
+                        onClick = {
+                            isPlaying = !isPlaying
+                            showControls = true
+                        },
+                        modifier = Modifier
+                            .size(96.dp)
+                            .background(
+                                color = Color.White.copy(alpha = 0.3f),
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                if (isPlaying) R.drawable.baseline_pause_circle_24
+                                else R.drawable.baseline_play_circle_filled_24
+                            ),
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            modifier = Modifier.size(56.dp),
+                            tint = Color.White
+                        )
                     }
 
                     // Next button
-                    Button(
+                    androidx.compose.material3.IconButton(
                         onClick = {
                             if (currentIndex < mediaItems.size - 1) {
                                 currentIndex++
+                                isPlaying = true
                                 showControls = true
                             }
                         },
                         enabled = currentIndex < mediaItems.size - 1,
-                        modifier = Modifier.width(160.dp)
+                        modifier = Modifier
+                            .size(80.dp)
+                            .background(
+                                color = Color.White.copy(alpha = 0.2f),
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
                     ) {
-                        Text("Next →")
+                        Icon(
+                            painter = painterResource(R.drawable.baseline_fast_forward_24),
+                            contentDescription = "Next",
+                            modifier = Modifier.size(48.dp),
+                            tint = Color.White
+                        )
                     }
+                }
+            }
+        }
+
+        // Side navigation buttons (only for images)
+        if (!currentItem.isVideo) {
+            AnimatedVisibility(
+                visible = showControls && currentIndex > 0,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.CenterStart)
+            ) {
+                androidx.compose.material3.IconButton(
+                    onClick = {
+                        if (currentIndex > 0) {
+                            currentIndex--
+                            showControls = true
+                        }
+                    },
+                    modifier = Modifier
+                        .padding(48.dp)
+                        .size(80.dp)
+                        .background(
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.baseline_skip_previous_24),
+                        contentDescription = "Previous",
+                        modifier = Modifier.size(48.dp),
+                        tint = Color.White
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = showControls && currentIndex < mediaItems.size - 1,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                androidx.compose.material3.IconButton(
+                    onClick = {
+                        if (currentIndex < mediaItems.size - 1) {
+                            currentIndex++
+                            showControls = true
+                        }
+                    },
+                    modifier = Modifier
+                        .padding(48.dp)
+                        .size(80.dp)
+                        .background(
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.baseline_skip_next_24),
+                        contentDescription = "Next",
+                        modifier = Modifier.size(48.dp),
+                        tint = Color.White
+                    )
+                }
+            }
+        }
+
+        // Bottom progress bar (for videos)
+        if (currentItem.isVideo) {
+            AnimatedVisibility(
+                visible = showControls,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.BottomStart)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.7f)
+                                )
+                            )
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 48.dp, vertical = 24.dp)
+                    ) {
+                        // Time display
+                        if (videoDuration > 0) {
+                            Text(
+                                text = "${formatTime(videoPosition)} - ${formatTime(videoDuration)}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                        }
+
+                        // Progress bar
+                        androidx.compose.material3.LinearProgressIndicator(
+                            progress = { if (videoDuration > 0) videoPosition.toFloat() / videoDuration else 0f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp),
+                            color = Color.White,
+                            trackColor = Color.White.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+            }
+        } else {
+            // Bottom info bar for images
+            AnimatedVisibility(
+                visible = showControls,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.BottomStart)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.7f)
+                                )
+                            )
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 48.dp, vertical = 24.dp)
+                    ) {
+                        Text(
+                            text = "${currentIndex + 1} of ${mediaItems.size}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White
+                        )
                     }
                 }
             }
@@ -303,7 +460,8 @@ fun VLCVideoPlayer(
     modifier: Modifier = Modifier,
     isPlaying: Boolean = true,
     onPlayingStateChange: (Boolean) -> Unit = {},
-    onPositionUpdate: (position: Long, duration: Long) -> Unit = { _, _ -> }
+    onPositionUpdate: (position: Long, duration: Long) -> Unit = { _, _ -> },
+    onMediaPlayerCreated: (MediaPlayer?) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -322,7 +480,9 @@ fun VLCVideoPlayer(
     val mediaPlayer = remember {
         libVLC?.let {
             android.util.Log.d("VLCVideoPlayer", "Creating MediaPlayer")
-            MediaPlayer(it)
+            MediaPlayer(it).also { player ->
+                onMediaPlayerCreated(player)
+            }
         }
     }
 
