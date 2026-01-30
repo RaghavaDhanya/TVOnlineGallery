@@ -84,11 +84,39 @@ class AuthManager(context: Context) {
     }
 
     /**
-     * Get the current access token
+     * Check if user has credentials (either valid access token or refresh token)
+     * This indicates they've logged in before and may not need to re-authenticate
      */
-    fun getAccessToken(): String? {
+    fun hasCredentials(): Boolean {
+        val hasAccessToken = !prefs.getString(KEY_ACCESS_TOKEN, null).isNullOrEmpty()
+        val hasRefreshToken = !prefs.getString(KEY_REFRESH_TOKEN, null).isNullOrEmpty()
+        return hasAccessToken || hasRefreshToken
+    }
+
+    /**
+     * Get the current access token
+     * Automatically refreshes if expired but refresh token is available
+     */
+    suspend fun getAccessToken(): String? {
+        val token = prefs.getString(KEY_ACCESS_TOKEN, null)
+        val expiry = prefs.getLong(KEY_TOKEN_EXPIRY, 0)
+        val hasRefreshToken = prefs.getString(KEY_REFRESH_TOKEN, null) != null
+
+        // If token is expired but we have refresh token, try to refresh
+        if (!token.isNullOrEmpty() && System.currentTimeMillis() >= expiry && hasRefreshToken) {
+            Log.d(TAG, "Access token expired, attempting automatic refresh")
+            val refreshResult = refreshToken()
+            if (refreshResult.isSuccess) {
+                Log.d(TAG, "Token refreshed successfully")
+                return prefs.getString(KEY_ACCESS_TOKEN, null)
+            } else {
+                Log.e(TAG, "Token refresh failed", refreshResult.exceptionOrNull())
+                return null
+            }
+        }
+
         return if (isAuthenticated()) {
-            prefs.getString(KEY_ACCESS_TOKEN, null)
+            token
         } else {
             null
         }

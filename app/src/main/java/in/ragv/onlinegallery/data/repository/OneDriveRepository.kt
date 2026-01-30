@@ -54,19 +54,17 @@ class OneDriveRepository(context: Context) {
 
     /**
      * Initialize the repository
+     * Automatically attempts to refresh token if expired
      */
     suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         try {
-            if (authManager.isAuthenticated()) {
-                val token = authManager.getAccessToken()
-                if (token != null) {
-                    graphClient = GraphApiClient(token)
-                    // Test the connection
-                    val testResult = graphClient?.testConnection()
-                    testResult?.isSuccess == true
-                } else {
-                    false
-                }
+            // getAccessToken() will automatically refresh if needed
+            val token = authManager.getAccessToken()
+            if (token != null) {
+                graphClient = GraphApiClient(token)
+                // Test the connection
+                val testResult = graphClient?.testConnection()
+                testResult?.isSuccess == true
             } else {
                 false
             }
@@ -81,6 +79,13 @@ class OneDriveRepository(context: Context) {
      */
     suspend fun isAuthenticated(): Boolean {
         return authManager.isAuthenticated()
+    }
+
+    /**
+     * Check if user has stored credentials (may need token refresh)
+     */
+    fun hasCredentials(): Boolean {
+        return authManager.hasCredentials()
     }
 
     /**
@@ -105,7 +110,7 @@ class OneDriveRepository(context: Context) {
     suspend fun completeSignIn(deviceCode: String, interval: Int = 5): Result<Boolean> {
         val result = authManager.pollForToken(deviceCode, interval)
         if (result.isSuccess) {
-            // Initialize the Graph client with the new token
+            // Initialize the Graph client with the new token (auto-refresh not needed here as token is fresh)
             val token = authManager.getAccessToken()
             if (token != null) {
                 graphClient = GraphApiClient(token)

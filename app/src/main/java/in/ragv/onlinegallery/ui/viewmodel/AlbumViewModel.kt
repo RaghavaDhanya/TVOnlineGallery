@@ -42,14 +42,34 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                val initialized = repository.initialize()
-                val isAuth = repository.isAuthenticated()
-                _uiState.value = _uiState.value.copy(
-                    isAuthenticated = isAuth,
-                    isLoading = false
-                )
-                if (isAuth && initialized) {
-                    loadAlbums()
+                // Check if user has credentials (may trigger automatic token refresh)
+                val hasCredentials = repository.hasCredentials()
+
+                if (hasCredentials) {
+                    // Try to initialize (this will auto-refresh token if needed)
+                    val initialized = repository.initialize()
+                    val isAuth = repository.isAuthenticated()
+
+                    _uiState.value = _uiState.value.copy(
+                        isAuthenticated = isAuth,
+                        isLoading = false
+                    )
+
+                    if (isAuth && initialized) {
+                        loadAlbums()
+                    } else if (!isAuth) {
+                        // Token refresh failed, need to re-authenticate
+                        _uiState.value = _uiState.value.copy(
+                            isAuthenticated = false,
+                            isLoading = false
+                        )
+                    }
+                } else {
+                    // No credentials at all, user needs to sign in
+                    _uiState.value = _uiState.value.copy(
+                        isAuthenticated = false,
+                        isLoading = false
+                    )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
