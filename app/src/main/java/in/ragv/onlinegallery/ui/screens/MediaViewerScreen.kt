@@ -4,6 +4,7 @@ import android.net.Uri
 import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -49,6 +50,9 @@ fun MediaViewerScreen(
     var videoPosition by remember { mutableStateOf(0L) }
     var videoDuration by remember { mutableStateOf(0L) }
     var mediaPlayerRef by remember { mutableStateOf<Any?>(null) }
+
+    // Intercept system back button to ensure proper navigation
+    BackHandler(onBack = onBackClick)
 
     // Auto-hide controls after 4 seconds
     LaunchedEffect(showControls, currentIndex) {
@@ -119,10 +123,6 @@ fun MediaViewerScreen(
                         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                             isPlaying = !isPlaying
                             showControls = true
-                            true
-                        }
-                        KeyEvent.KEYCODE_BACK -> {
-                            onBackClick()
                             true
                         }
                         else -> {
