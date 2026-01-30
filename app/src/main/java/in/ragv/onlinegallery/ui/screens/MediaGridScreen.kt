@@ -18,6 +18,10 @@ import androidx.tv.material3.*
 import coil.compose.AsyncImage
 import `in`.ragv.onlinegallery.data.models.MediaItem
 import `in`.ragv.onlinegallery.ui.viewmodel.MediaViewModel
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import `in`.ragv.onlinegallery.R
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -131,16 +135,18 @@ fun MediaCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(48.dp)
+                        .size(64.dp)
                         .background(
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            color = Color.Black.copy(alpha = 0.5f),
                             shape = androidx.compose.foundation.shape.CircleShape
-                        )
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "▶",
-                        style = MaterialTheme.typography.headlineMedium,
-                        modifier = Modifier.align(Alignment.Center)
+                    Icon(
+                        painter = painterResource(R.drawable.baseline_play_circle_filled_24),
+                        contentDescription = "Video",
+                        modifier = Modifier.size(48.dp),
+                        tint = Color.White
                     )
                 }
             }
