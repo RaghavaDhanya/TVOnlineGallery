@@ -41,6 +41,8 @@ fun MediaViewerScreen(
     val currentItem = mediaItems[currentIndex]
     var showControls by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(true) }
+    var videoPosition by remember { mutableStateOf(0L) }
+    var videoDuration by remember { mutableStateOf(0L) }
 
     // Auto-hide controls after 4 seconds
     LaunchedEffect(showControls, currentIndex) {
@@ -103,7 +105,11 @@ fun MediaViewerScreen(
                 url = currentItem.url,
                 modifier = Modifier.fillMaxSize(),
                 isPlaying = isPlaying,
-                onPlayingStateChange = { isPlaying = it }
+                onPlayingStateChange = { isPlaying = it },
+                onPositionUpdate = { position, duration ->
+                    videoPosition = position
+                    videoDuration = duration
+                }
             )
         } else {
             AsyncImage(
@@ -174,13 +180,45 @@ fun MediaViewerScreen(
                         )
                     )
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 48.dp, vertical = 32.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 48.dp, vertical = 32.dp)
                 ) {
+                    // Video progress bar (only for videos)
+                    if (currentItem.isVideo && videoDuration > 0) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = formatTime(videoPosition),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White
+                            )
+                            androidx.compose.material3.LinearProgressIndicator(
+                                progress = { videoPosition.toFloat() / videoDuration },
+                                modifier = Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = Color.White.copy(alpha = 0.3f)
+                            )
+                            Text(
+                                text = formatTime(videoDuration),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    // Control buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     // Back button
                     Button(
                         onClick = {
@@ -241,9 +279,21 @@ fun MediaViewerScreen(
                     ) {
                         Text("Next →")
                     }
+                    }
                 }
             }
         }
+    }
+}
+
+private fun formatTime(milliseconds: Long): String {
+    val seconds = (milliseconds / 1000) % 60
+    val minutes = (milliseconds / (1000 * 60)) % 60
+    val hours = (milliseconds / (1000 * 60 * 60))
+    return if (hours > 0) {
+        String.format("%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%d:%02d", minutes, seconds)
     }
 }
 
@@ -252,7 +302,8 @@ fun VLCVideoPlayer(
     url: String,
     modifier: Modifier = Modifier,
     isPlaying: Boolean = true,
-    onPlayingStateChange: (Boolean) -> Unit = {}
+    onPlayingStateChange: (Boolean) -> Unit = {},
+    onPositionUpdate: (position: Long, duration: Long) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
 
@@ -305,6 +356,16 @@ fun VLCVideoPlayer(
                 android.util.Log.d("VLCVideoPlayer", "Pausing")
                 player.pause()
             }
+        }
+    }
+
+    // Update position periodically and notify parent
+    LaunchedEffect(Unit) {
+        while (true) {
+            mediaPlayer?.let { player ->
+                onPositionUpdate(player.time, player.length)
+            }
+            delay(500)
         }
     }
 
