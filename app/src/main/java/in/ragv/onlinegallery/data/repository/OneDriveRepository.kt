@@ -5,9 +5,12 @@ import android.util.Log
 import `in`.ragv.onlinegallery.data.api.DriveItemResponse
 import `in`.ragv.onlinegallery.data.api.GraphApiClient
 import `in`.ragv.onlinegallery.data.auth.AuthManager
+import `in`.ragv.onlinegallery.data.cache.CacheManager
 import `in`.ragv.onlinegallery.data.models.Album
 import `in`.ragv.onlinegallery.data.models.MediaItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
 /**
@@ -16,6 +19,7 @@ import kotlinx.coroutines.withContext
 class OneDriveRepository(context: Context) {
 
     private val authManager = AuthManager(context)
+    private val cacheManager = CacheManager(context)
     private var graphClient: GraphApiClient? = null
 
     companion object {
@@ -113,12 +117,24 @@ class OneDriveRepository(context: Context) {
     /**
      * Get list of albums (folders) from OneDrive
      * Each folder in the root path becomes an album
+     * Returns a Flow that emits cached data first (if available), then fresh data from API
      */
-    suspend fun getAlbums(): List<Album> = withContext(Dispatchers.IO) {
+    fun getAlbums(): Flow<List<Album>> = flow {
+        // First, emit cached data if available
+        val cachedAlbums = cacheManager.getCachedAlbums()
+        if (cachedAlbums != null && cachedAlbums.isNotEmpty()) {
+            Log.d(TAG, "Emitting ${cachedAlbums.size} cached albums")
+            emit(cachedAlbums)
+        }
+
+        // Then fetch fresh data from API
         try {
             val client = graphClient ?: run {
                 Log.e(TAG, "Graph client not initialized")
-                return@withContext emptyList()
+                if (cachedAlbums == null) {
+                    emit(emptyList())
+                }
+                return@flow
             }
 
             // Get children of the root folder path
@@ -126,13 +142,22 @@ class OneDriveRepository(context: Context) {
 
             if (result.isFailure) {
                 Log.e(TAG, "Failed to get albums", result.exceptionOrNull())
-                return@withContext emptyList()
+                if (cachedAlbums == null) {
+                    emit(emptyList())
+                }
+                return@flow
             }
 
-            val response = result.getOrNull() ?: return@withContext emptyList()
+            val response = result.getOrNull()
+            if (response == null) {
+                if (cachedAlbums == null) {
+                    emit(emptyList())
+                }
+                return@flow
+            }
 
             // Filter for folders only and map to Album objects
-            response.items
+            val freshAlbums = response.items
                 .filter { it.folder != null } // Only folders
                 .map { item ->
                     Album(
@@ -142,21 +167,42 @@ class OneDriveRepository(context: Context) {
                         itemCount = item.folder?.childCount ?: 0
                     )
                 }
+
+            // Save to cache
+            cacheManager.saveAlbums(freshAlbums)
+
+            // Emit fresh data
+            Log.d(TAG, "Emitting ${freshAlbums.size} fresh albums from API")
+            emit(freshAlbums)
         } catch (e: Exception) {
             Log.e(TAG, "Error getting albums", e)
-            emptyList()
+            if (cachedAlbums == null) {
+                emit(emptyList())
+            }
         }
     }
 
     /**
      * Get media items (photos and videos) from an album
      * @param albumId The ID of the album (folder)
+     * Returns a Flow that emits cached data first (if available), then fresh data from API
      */
-    suspend fun getMediaItems(albumId: String): List<MediaItem> = withContext(Dispatchers.IO) {
+    fun getMediaItems(albumId: String): Flow<List<MediaItem>> = flow {
+        // First, emit cached data if available
+        val cachedMedia = cacheManager.getCachedMediaItems(albumId)
+        if (cachedMedia != null && cachedMedia.isNotEmpty()) {
+            Log.d(TAG, "Emitting ${cachedMedia.size} cached media items for album $albumId")
+            emit(cachedMedia)
+        }
+
+        // Then fetch fresh data from API
         try {
             val client = graphClient ?: run {
                 Log.e(TAG, "Graph client not initialized")
-                return@withContext emptyList()
+                if (cachedMedia == null) {
+                    emit(emptyList())
+                }
+                return@flow
             }
 
             // Get children of the folder
@@ -164,17 +210,28 @@ class OneDriveRepository(context: Context) {
 
             if (result.isFailure) {
                 Log.e(TAG, "Failed to get media items", result.exceptionOrNull())
-                return@withContext emptyList()
+                if (cachedMedia == null) {
+                    emit(emptyList())
+                }
+                return@flow
             }
 
-            val response = result.getOrNull() ?: return@withContext emptyList()
+            val response = result.getOrNull()
+            if (response == null) {
+                if (cachedMedia == null) {
+                    emit(emptyList())
+                }
+                return@flow
+            }
 
             // Filter for media files and map to MediaItem objects
-            response.items
+            val freshMedia = response.items
                 .filter { it.file != null && isMediaFile(it) } // Only media files
                 .mapNotNull { item ->
-                    // For files without downloadUrl in the list response, we need to fetch it
+                    // downloadUrl should be included in the response now
                     val downloadUrl = item.downloadUrl ?: run {
+                        // Fallback: fetch individual item (should rarely happen now)
+                        Log.w(TAG, "downloadUrl missing for ${item.name}, fetching individually")
                         val itemResult = client.getItem(item.id)
                         itemResult.getOrNull()?.downloadUrl
                     }
@@ -194,9 +251,18 @@ class OneDriveRepository(context: Context) {
                         mimeType = item.file?.mimeType
                     )
                 }
+
+            // Save to cache
+            cacheManager.saveMediaItems(albumId, freshMedia)
+
+            // Emit fresh data
+            Log.d(TAG, "Emitting ${freshMedia.size} fresh media items from API for album $albumId")
+            emit(freshMedia)
         } catch (e: Exception) {
             Log.e(TAG, "Error getting media items", e)
-            emptyList()
+            if (cachedMedia == null) {
+                emit(emptyList())
+            }
         }
     }
 
@@ -206,6 +272,7 @@ class OneDriveRepository(context: Context) {
     suspend fun signOut() {
         authManager.signOut()
         graphClient = null
+        cacheManager.clearCache()
     }
 
     /**

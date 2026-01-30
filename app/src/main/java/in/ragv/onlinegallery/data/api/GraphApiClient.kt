@@ -38,9 +38,9 @@ class GraphApiClient(private val accessToken: String) {
             try {
                 val encodedPath = path.trim('/').ifEmpty { "" }
                 val url = if (encodedPath.isEmpty()) {
-                    "$baseUrl/me/drive/root/children?select=id,name,size,folder,file,image,photo,video,webUrl,createdDateTime,lastModifiedDateTime&expand=thumbnails"
+                    "$baseUrl/me/drive/root/children?select=id,name,size,folder,file,image,photo,video,@microsoft.graph.downloadUrl,webUrl,createdDateTime,lastModifiedDateTime&expand=thumbnails"
                 } else {
-                    "$baseUrl/me/drive/root:/$encodedPath:/children?select=id,name,size,folder,file,image,photo,video,webUrl,createdDateTime,lastModifiedDateTime&expand=thumbnails"
+                    "$baseUrl/me/drive/root:/$encodedPath:/children?select=id,name,size,folder,file,image,photo,video,@microsoft.graph.downloadUrl,webUrl,createdDateTime,lastModifiedDateTime&expand=thumbnails"
                 }
 
                 val request = Request.Builder()
@@ -89,7 +89,7 @@ class GraphApiClient(private val accessToken: String) {
     suspend fun getFolderChildrenById(itemId: String): Result<DriveItemListResponse> =
         withContext(Dispatchers.IO) {
             try {
-                val url = "$baseUrl/me/drive/items/$itemId/children?select=id,name,size,folder,file,image,photo,video,webUrl,createdDateTime,lastModifiedDateTime&expand=thumbnails"
+                val url = "$baseUrl/me/drive/items/$itemId/children?select=id,name,size,folder,file,image,photo,video,@microsoft.graph.downloadUrl,webUrl,createdDateTime,lastModifiedDateTime&expand=thumbnails"
 
                 val request = Request.Builder()
                     .url(url)

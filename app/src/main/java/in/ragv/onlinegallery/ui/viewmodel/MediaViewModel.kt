@@ -33,11 +33,19 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
             )
             try {
                 repository.initialize()
-                val items = repository.getMediaItems(albumId)
-                _uiState.value = _uiState.value.copy(
-                    mediaItems = items,
-                    isLoading = false
-                )
+                var isFirstEmission = true
+                repository.getMediaItems(albumId).collect { items ->
+                    _uiState.value = _uiState.value.copy(
+                        mediaItems = items,
+                        isLoading = false
+                    )
+                    if (isFirstEmission) {
+                        android.util.Log.d("MediaViewModel", "First emission (cached or fresh): ${items.size} items")
+                        isFirstEmission = false
+                    } else {
+                        android.util.Log.d("MediaViewModel", "Second emission (fresh): ${items.size} items")
+                    }
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

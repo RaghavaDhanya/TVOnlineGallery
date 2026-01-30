@@ -140,16 +140,25 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Load albums from OneDrive
+     * First shows cached data (if available), then updates with fresh data from API
      */
     fun loadAlbums() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                val albums = repository.getAlbums()
-                _uiState.value = _uiState.value.copy(
-                    albums = albums,
-                    isLoading = false
-                )
+                var isFirstEmission = true
+                repository.getAlbums().collect { albums ->
+                    _uiState.value = _uiState.value.copy(
+                        albums = albums,
+                        isLoading = false
+                    )
+                    if (isFirstEmission) {
+                        android.util.Log.d("AlbumViewModel", "First emission (cached or fresh): ${albums.size} albums")
+                        isFirstEmission = false
+                    } else {
+                        android.util.Log.d("AlbumViewModel", "Second emission (fresh): ${albums.size} albums")
+                    }
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
