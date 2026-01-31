@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -28,6 +29,9 @@ fun AlbumListScreen(
     onAlbumClick: (Album) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Preserve scroll position across navigation and configuration changes
+    val gridState = rememberLazyGridState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -81,6 +85,7 @@ fun AlbumListScreen(
                     )
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
+                        state = gridState,
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {

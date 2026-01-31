@@ -10,18 +10,25 @@
         android:required="false" />
     <uses-feature
         android:name="android.software.leanback"
+        android:required="true" />
+    <uses-feature
+        android:name="android.hardware.type.television"
         android:required="false" />
 
     <application
         android:allowBackup="true"
-        android:banner="@mipmap/ic_launcher"
+        android:banner="@drawable/banner"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.OnlineGallery">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:banner="@drawable/banner"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -29,6 +36,11 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Fire TV specific metadata for banner support -->
+        <meta-data
+            android:name="com.amazon.android.tv.banner"
+            android:resource="@drawable/banner" />
     </application>
 
 </manifest>
