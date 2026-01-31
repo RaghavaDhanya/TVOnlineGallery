@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.shape.CircleShape
@@ -147,11 +149,36 @@ fun MediaViewerScreen(
                 onMediaPlayerCreated = { mediaPlayerRef = it }
             )
         } else {
-            AsyncImage(
-                model = currentItem.url,
+            // Progressive image loading: show thumbnail immediately, load full res in background
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(currentItem.url)
+                    .crossfade(300)
+                    .placeholderMemoryCacheKey(currentItem.thumbnailUrl) // Use cached thumbnail as placeholder
+                    .build(),
                 contentDescription = currentItem.name,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
+                contentScale = ContentScale.Fit,
+                loading = {
+                    // While loading full res, show thumbnail if available
+                    if (currentItem.thumbnailUrl != null) {
+                        AsyncImage(
+                            model = currentItem.thumbnailUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
             )
         }
 
