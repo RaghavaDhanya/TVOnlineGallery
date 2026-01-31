@@ -29,7 +29,8 @@ fun AlbumListScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            !uiState.isAuthenticated -> {
+            // Show login screen only when we know for sure user is not authenticated
+            uiState.isAuthenticated == false -> {
                 SignInScreen(
                     onSignIn = { viewModel.signIn() },
                     deviceCodeData = uiState.deviceCodeData,
@@ -37,12 +38,13 @@ fun AlbumListScreen(
                     error = uiState.error
                 )
             }
-            uiState.isLoading -> {
+            // Show loading only if no albums and still checking auth
+            uiState.isLoading && uiState.albums.isEmpty() -> {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
-            uiState.error != null -> {
+            uiState.error != null && uiState.albums.isEmpty() -> {
                 Column(
                     modifier = Modifier.align(Alignment.Center),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -57,7 +59,7 @@ fun AlbumListScreen(
                     }
                 }
             }
-            uiState.albums.isEmpty() -> {
+            uiState.albums.isEmpty() && uiState.isAuthenticated == true -> {
                 Text(
                     text = "No albums found",
                     style = MaterialTheme.typography.bodyLarge,

@@ -20,9 +20,9 @@ data class DeviceCodeData(
 
 data class AlbumUiState(
     val albums: List<Album> = emptyList(),
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true, // Start with loading to avoid flashing login screen
     val error: String? = null,
-    val isAuthenticated: Boolean = false,
+    val isAuthenticated: Boolean? = null, // null = checking, true = authenticated, false = not authenticated
     val deviceCodeData: DeviceCodeData? = null,
     val isAuthenticating: Boolean = false
 )
@@ -40,9 +40,19 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun initialize() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                // Check if user has credentials (may trigger automatic token refresh)
+                // First, load cached albums immediately (instant display)
+                val cachedAlbums = repository.getCachedAlbums()
+                if (cachedAlbums != null && cachedAlbums.isNotEmpty()) {
+                    _uiState.value = _uiState.value.copy(
+                        albums = cachedAlbums,
+                        isLoading = false,
+                        isAuthenticated = true // Assume authenticated if we have cached data
+                    )
+                    android.util.Log.d("AlbumViewModel", "Loaded ${cachedAlbums.size} cached albums")
+                }
+
+                // Then check credentials and refresh in background
                 val hasCredentials = repository.hasCredentials()
 
                 if (hasCredentials) {
@@ -56,24 +66,28 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
                     )
 
                     if (isAuth && initialized) {
+                        // Load fresh albums from API (will update cache)
                         loadAlbums()
                     } else if (!isAuth) {
                         // Token refresh failed, need to re-authenticate
                         _uiState.value = _uiState.value.copy(
                             isAuthenticated = false,
-                            isLoading = false
+                            isLoading = false,
+                            albums = emptyList() // Clear cached albums as auth failed
                         )
                     }
                 } else {
                     // No credentials at all, user needs to sign in
                     _uiState.value = _uiState.value.copy(
                         isAuthenticated = false,
-                        isLoading = false
+                        isLoading = false,
+                        albums = emptyList()
                     )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isAuthenticated = false,
                     error = e.message
                 )
             }

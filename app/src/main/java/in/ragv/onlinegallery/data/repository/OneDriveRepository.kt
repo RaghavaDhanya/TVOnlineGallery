@@ -89,6 +89,13 @@ class OneDriveRepository(context: Context) {
     }
 
     /**
+     * Get cached albums synchronously (for instant display on startup)
+     */
+    fun getCachedAlbums(): List<Album>? {
+        return cacheManager.getCachedAlbums()
+    }
+
+    /**
      * Start the device code authentication flow
      * Returns info to display to the user
      */
