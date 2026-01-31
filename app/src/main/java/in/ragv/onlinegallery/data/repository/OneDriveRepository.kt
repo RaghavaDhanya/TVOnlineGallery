@@ -169,16 +169,19 @@ class OneDriveRepository(context: Context) {
             }
 
             // Filter for folders only and map to Album objects
-            val freshAlbums = response.items
-                .filter { it.folder != null } // Only folders
-                .map { item ->
-                    Album(
-                        id = item.id,
-                        name = item.name,
-                        thumbnailUrl = item.thumbnails?.firstOrNull()?.large?.url,
-                        itemCount = item.folder?.childCount ?: 0
-                    )
-                }
+            val folders = response.items.filter { it.folder != null }
+
+            // For each folder, try to get a thumbnail from cached media or API
+            val freshAlbums = folders.map { item ->
+                val thumbnailUrl = getAlbumCoverThumbnail(item.id)
+
+                Album(
+                    id = item.id,
+                    name = item.name,
+                    thumbnailUrl = thumbnailUrl,
+                    itemCount = item.folder?.childCount ?: 0
+                )
+            }
 
             // Save to cache
             cacheManager.saveAlbums(freshAlbums)
@@ -285,6 +288,52 @@ class OneDriveRepository(context: Context) {
         authManager.signOut()
         graphClient = null
         cacheManager.clearCache()
+    }
+
+    /**
+     * Get a thumbnail for an album cover
+     * First tries cached media items, then fetches from API if needed
+     * @param albumId The folder ID
+     * @return Thumbnail URL or null if no media items found
+     */
+    private suspend fun getAlbumCoverThumbnail(albumId: String): String? {
+        // First, check cached media items
+        val cachedMedia = cacheManager.getCachedMediaItems(albumId)
+        if (!cachedMedia.isNullOrEmpty()) {
+            val thumbnail = cachedMedia.firstOrNull()?.thumbnailUrl
+            if (thumbnail != null) {
+                Log.d(TAG, "Using cached thumbnail for album $albumId")
+                return thumbnail
+            }
+        }
+
+        // No cached media or no thumbnail, fetch first item from API
+        try {
+            val client = graphClient ?: return null
+
+            // Fetch just the first few items to find a media file with thumbnail
+            val result = client.getFolderChildrenById(albumId)
+            if (result.isSuccess) {
+                val items = result.getOrNull()?.items ?: return null
+
+                // Find first media file with a thumbnail
+                val mediaItem = items
+                    .filter { it.file != null && isMediaFile(it) }
+                    .firstOrNull { it.thumbnails?.isNotEmpty() == true }
+
+                val thumbnailUrl = mediaItem?.thumbnails?.firstOrNull()?.large?.url
+                    ?: mediaItem?.thumbnails?.firstOrNull()?.medium?.url
+
+                if (thumbnailUrl != null) {
+                    Log.d(TAG, "Fetched thumbnail from API for album $albumId")
+                }
+                return thumbnailUrl
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting album cover thumbnail for $albumId", e)
+        }
+
+        return null
     }
 
     /**
