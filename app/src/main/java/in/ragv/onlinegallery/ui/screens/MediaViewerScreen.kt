@@ -484,6 +484,7 @@ fun VLCVideoPlayer(
     onMediaPlayerCreated: (MediaPlayer?) -> Unit = {}
 ) {
     val context = LocalContext.current
+    var isBuffering by remember { mutableStateOf(false) }
 
     // Create LibVLC instance
     val libVLC = remember {
@@ -501,6 +502,31 @@ fun VLCVideoPlayer(
         libVLC?.let {
             android.util.Log.d("VLCVideoPlayer", "Creating MediaPlayer")
             MediaPlayer(it).also { player ->
+                // Add event listener to detect buffering
+                player.setEventListener { event ->
+                    when (event.type) {
+                        MediaPlayer.Event.Buffering -> {
+                            val bufferPercent = event.buffering
+                            android.util.Log.d("VLCVideoPlayer", "Buffering: $bufferPercent%")
+                            isBuffering = bufferPercent < 100f
+                        }
+                        MediaPlayer.Event.Playing -> {
+                            android.util.Log.d("VLCVideoPlayer", "Event: Playing")
+                            isBuffering = false
+                        }
+                        MediaPlayer.Event.Paused -> {
+                            android.util.Log.d("VLCVideoPlayer", "Event: Paused")
+                        }
+                        MediaPlayer.Event.EndReached -> {
+                            android.util.Log.d("VLCVideoPlayer", "Event: End Reached")
+                        }
+                        MediaPlayer.Event.EncounteredError -> {
+                            android.util.Log.e("VLCVideoPlayer", "Event: Encountered Error")
+                            isBuffering = false
+                        }
+                        else -> {}
+                    }
+                }
                 onMediaPlayerCreated(player)
             }
         }
@@ -513,7 +539,11 @@ fun VLCVideoPlayer(
             try {
                 val media = Media(libVLC, Uri.parse(url))
                 media.setHWDecoderEnabled(true, false)
-                media.addOption(":network-caching=1000")
+                // Increased network caching from 1000ms to 3000ms for better buffering
+                // This helps prevent stuttering when streaming from OneDrive
+                media.addOption(":network-caching=3000")
+                media.addOption(":file-caching=1000")
+                media.addOption(":live-caching=1000")
 
                 player.media = media
                 media.release()
@@ -560,19 +590,47 @@ fun VLCVideoPlayer(
         }
     }
 
-    AndroidView(
-        factory = { ctx ->
-            android.util.Log.d("VLCVideoPlayer", "Creating VLCVideoLayout")
-            VLCVideoLayout(ctx).apply {
-                layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { ctx ->
+                android.util.Log.d("VLCVideoPlayer", "Creating VLCVideoLayout")
+                VLCVideoLayout(ctx).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
 
-                // Attach the media player to this layout
-                mediaPlayer?.attachViews(this, null, false, false)
+                    // Attach the media player to this layout
+                    mediaPlayer?.attachViews(this, null, false, false)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Buffering indicator
+        if (isBuffering) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(64.dp),
+                        color = Color.White,
+                        strokeWidth = 6.dp
+                    )
+                    Text(
+                        text = "Buffering...",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White
+                    )
+                }
             }
-        },
-        modifier = modifier
-    )
+        }
+    }
 }
