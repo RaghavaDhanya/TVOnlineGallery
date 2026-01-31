@@ -11,6 +11,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
@@ -124,6 +126,21 @@ fun AlbumCard(
                         )
                 )
             }
+            // Gradient scrim for text visibility
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.5f)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.8f)
+                            )
+                        )
+                    )
+            )
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -132,11 +149,13 @@ fun AlbumCard(
             ) {
                 Text(
                     text = album.name,
-                    style = MaterialTheme.typography.titleLarge
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White
                 )
                 Text(
                     text = "${album.itemCount} items",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.9f)
                 )
             }
         }
