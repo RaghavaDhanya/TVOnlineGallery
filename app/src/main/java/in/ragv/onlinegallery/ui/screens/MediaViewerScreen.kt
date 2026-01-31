@@ -149,37 +149,30 @@ fun MediaViewerScreen(
                 onMediaPlayerCreated = { mediaPlayerRef = it }
             )
         } else {
-            // Progressive image loading: show thumbnail immediately, load full res in background
-            SubcomposeAsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(currentItem.url)
-                    .crossfade(300)
-                    .placeholderMemoryCacheKey(currentItem.thumbnailUrl) // Use cached thumbnail as placeholder
-                    .build(),
-                contentDescription = currentItem.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-                loading = {
-                    // While loading full res, show thumbnail if available
-                    if (currentItem.thumbnailUrl != null) {
-                        AsyncImage(
-                            model = currentItem.thumbnailUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            androidx.compose.material3.CircularProgressIndicator(
-                                color = Color.White
-                            )
-                        }
-                    }
+            // Progressive image loading: thumbnail underneath, full res on top with crossfade
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Base layer: thumbnail (shows instantly from cache)
+                if (currentItem.thumbnailUrl != null) {
+                    AsyncImage(
+                        model = currentItem.thumbnailUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
                 }
-            )
+
+                // Top layer: full resolution image with Coil's built-in crossfade
+                // Crossfade will smoothly transition from transparent to opaque
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(currentItem.url)
+                        .crossfade(500) // Smooth 500ms fade
+                        .build(),
+                    contentDescription = currentItem.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
 
         // Top bar overlay
