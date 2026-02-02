@@ -53,16 +53,17 @@ class AuthManager(context: Context) {
         private const val SCOPES = "Files.Read Files.Read.All offline_access"
 
         /**
-         * IMPORTANT: Replace this with your actual Azure AD Application Client ID
-         * To get a Client ID:
-         * 1. Go to https://portal.azure.com/
-         * 2. Navigate to Azure Active Directory > App registrations
-         * 3. Create a new registration (or use existing)
-         * 4. Select "Mobile and desktop applications" platform
-         * 5. Enable "Allow public client flows" in Authentication settings
-         * 6. Copy the Application (client) ID
+         * Client ID is loaded from local.properties file
+         * To configure:
+         * 1. Add to local.properties: CLIENT_ID=your-client-id-here
+         * 2. Get a Client ID from https://portal.azure.com/
+         * 3. Navigate to Azure Active Directory > App registrations
+         * 4. Create a new registration (or use existing)
+         * 5. Select "Mobile and desktop applications" platform
+         * 6. Enable "Allow public client flows" in Authentication settings
+         * 7. Copy the Application (client) ID
          */
-        const val CLIENT_ID = "your-client-id-here"
+        val CLIENT_ID = `in`.ragv.onlinegallery.BuildConfig.CLIENT_ID
     }
 
     /**

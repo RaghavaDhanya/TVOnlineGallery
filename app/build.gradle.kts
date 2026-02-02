@@ -1,8 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Read CLIENT_ID from local.properties
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+val clientId: String = localProperties.getProperty("CLIENT_ID")
+    ?: throw GradleException("CLIENT_ID not found in local.properties. Please add: CLIENT_ID=your-client-id-here")
 
 android {
     namespace = "in.ragv.onlinegallery"
@@ -15,6 +28,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        buildConfigField("String", "CLIENT_ID", "\"$clientId\"")
     }
 
     buildTypes {
@@ -35,6 +49,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
