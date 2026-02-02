@@ -85,12 +85,15 @@ app/src/main/java/in/ragv/onlinegallery/
 4. Click **Add permissions**
 5. (Optional) Click **Grant admin consent** if available
 
-### 4. Update the App
+### 4. Configure Client ID
 
-1. Open `app/src/main/java/in/ragv/onlinegallery/data/auth/AuthManager.kt`
-2. Replace `YOUR_CLIENT_ID_HERE` with your Application (client) ID (around line 60):
-   ```kotlin
-   const val CLIENT_ID = "your-client-id-here"
+1. Copy `local.properties.example` to `local.properties`:
+   ```bash
+   cp local.properties.example local.properties
+   ```
+2. Open `local.properties` and replace `your-client-id-here` with your Application (client) ID:
+   ```properties
+   CLIENT_ID=your-actual-client-id-from-azure
    ```
 
 3. **IMPORTANT**: Match the endpoint to your Azure configuration:
@@ -303,12 +306,13 @@ Edit `GraphApiClient.kt` (lines 28-30):
 
 ## Security & Privacy
 
-- **Client ID**: Not secret, safe to include in app
+- **Client ID**: Stored in `local.properties` (not committed to git) to prevent quota abuse
 - **Tokens**: Stored locally in SharedPreferences (app-private)
 - **Access tokens**: Valid for 1 hour
 - **Refresh tokens**: Valid for 90 days (rolling)
 - **HTTPS only**: All API communication encrypted
 - **No server**: Direct device-to-Microsoft communication
+- **Public client**: No client secrets (users authenticate themselves)
 
 ## Resources
 
