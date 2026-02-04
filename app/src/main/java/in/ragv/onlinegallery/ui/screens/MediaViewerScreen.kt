@@ -11,9 +11,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onKeyEvent
@@ -24,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.tv.material3.*
+import androidx.tv.material3.Border
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
@@ -53,6 +58,11 @@ fun MediaViewerScreen(
     var videoDuration by remember { mutableStateOf(0L) }
     var mediaPlayerRef by remember { mutableStateOf<Any?>(null) }
 
+    // Focus requesters for video control buttons
+    val previousButtonFocusRequester = remember { FocusRequester() }
+    val nextButtonFocusRequester = remember { FocusRequester() }
+    var pendingFocusRequest by remember { mutableStateOf<String?>(null) }
+
     // Intercept system back button to ensure proper navigation
     BackHandler(onBack = onBackClick)
 
@@ -61,6 +71,19 @@ fun MediaViewerScreen(
         if (showControls) {
             delay(4000)
             showControls = false
+        }
+    }
+
+    // Handle pending focus requests when controls become visible
+    LaunchedEffect(showControls, pendingFocusRequest) {
+        if (showControls && pendingFocusRequest != null) {
+            // Small delay to ensure buttons are composed
+            delay(50)
+            when (pendingFocusRequest) {
+                "previous" -> previousButtonFocusRequester.requestFocus()
+                "next" -> nextButtonFocusRequester.requestFocus()
+            }
+            pendingFocusRequest = null
         }
     }
 
@@ -117,10 +140,31 @@ fun MediaViewerScreen(
                                 true
                             }
                         }
-                        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                            // Up/Down shows controls
-                            showControls = true
-                            false // Let it propagate for focus navigation
+                        KeyEvent.KEYCODE_DPAD_UP -> {
+                            if (currentItem.isVideo) {
+                                // Show controls and mark previous button for focus
+                                if (currentIndex > 0) {
+                                    pendingFocusRequest = "previous"
+                                }
+                                showControls = true
+                                true
+                            } else {
+                                showControls = true
+                                false
+                            }
+                        }
+                        KeyEvent.KEYCODE_DPAD_DOWN -> {
+                            if (currentItem.isVideo) {
+                                // Show controls and mark next button for focus
+                                if (currentIndex < mediaItems.size - 1) {
+                                    pendingFocusRequest = "next"
+                                }
+                                showControls = true
+                                true
+                            } else {
+                                showControls = true
+                                false
+                            }
                         }
                         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                             isPlaying = !isPlaying
@@ -240,7 +284,7 @@ fun MediaViewerScreen(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     // Previous button
-                    androidx.compose.material3.IconButton(
+                    Surface(
                         onClick = {
                             if (currentIndex > 0) {
                                 currentIndex--
@@ -249,47 +293,75 @@ fun MediaViewerScreen(
                             }
                         },
                         enabled = currentIndex > 0,
+                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White.copy(alpha = 0.2f),
+                            focusedContainerColor = Color.White.copy(alpha = 0.4f),
+                            contentColor = Color.White
+                        ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(3.dp, Color.White),
+                                shape = CircleShape
+                            )
+                        ),
                         modifier = Modifier
                             .size(80.dp)
-                            .background(
-                                color = Color.White.copy(alpha = 0.2f),
-                                shape = androidx.compose.foundation.shape.CircleShape
-                            )
+                            .focusRequester(previousButtonFocusRequester)
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.baseline_fast_rewind_24),
-                            contentDescription = "Previous",
-                            modifier = Modifier.size(48.dp),
-                            tint = Color.White
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.baseline_fast_rewind_24),
+                                contentDescription = "Previous",
+                                modifier = Modifier.size(48.dp),
+                                tint = Color.White
+                            )
+                        }
                     }
 
                     // Play/Pause button (larger)
-                    androidx.compose.material3.IconButton(
+                    Surface(
                         onClick = {
                             isPlaying = !isPlaying
                             showControls = true
                         },
-                        modifier = Modifier
-                            .size(96.dp)
-                            .background(
-                                color = Color.White.copy(alpha = 0.3f),
-                                shape = androidx.compose.foundation.shape.CircleShape
+                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White.copy(alpha = 0.3f),
+                            focusedContainerColor = Color.White.copy(alpha = 0.5f),
+                            contentColor = Color.White
+                        ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(3.dp, Color.White),
+                                shape = CircleShape
                             )
+                        ),
+                        modifier = Modifier.size(96.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(
-                                if (isPlaying) R.drawable.baseline_pause_circle_24
-                                else R.drawable.baseline_play_circle_filled_24
-                            ),
-                            contentDescription = if (isPlaying) "Pause" else "Play",
-                            modifier = Modifier.size(56.dp),
-                            tint = Color.White
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    if (isPlaying) R.drawable.baseline_pause_circle_24
+                                    else R.drawable.baseline_play_circle_filled_24
+                                ),
+                                contentDescription = if (isPlaying) "Pause" else "Play",
+                                modifier = Modifier.size(56.dp),
+                                tint = Color.White
+                            )
+                        }
                     }
 
                     // Next button
-                    androidx.compose.material3.IconButton(
+                    Surface(
                         onClick = {
                             if (currentIndex < mediaItems.size - 1) {
                                 currentIndex++
@@ -298,19 +370,34 @@ fun MediaViewerScreen(
                             }
                         },
                         enabled = currentIndex < mediaItems.size - 1,
+                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White.copy(alpha = 0.2f),
+                            focusedContainerColor = Color.White.copy(alpha = 0.4f),
+                            contentColor = Color.White
+                        ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(3.dp, Color.White),
+                                shape = CircleShape
+                            )
+                        ),
                         modifier = Modifier
                             .size(80.dp)
-                            .background(
-                                color = Color.White.copy(alpha = 0.2f),
-                                shape = androidx.compose.foundation.shape.CircleShape
-                            )
+                            .focusRequester(nextButtonFocusRequester)
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.baseline_fast_forward_24),
-                            contentDescription = "Next",
-                            modifier = Modifier.size(48.dp),
-                            tint = Color.White
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.baseline_fast_forward_24),
+                                contentDescription = "Next",
+                                modifier = Modifier.size(48.dp),
+                                tint = Color.White
+                            )
+                        }
                     }
                 }
             }
