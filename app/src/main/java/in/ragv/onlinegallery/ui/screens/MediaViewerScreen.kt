@@ -296,13 +296,14 @@ fun MediaViewerScreen(
                         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = Color.White.copy(alpha = 0.2f),
-                            focusedContainerColor = Color.White.copy(alpha = 0.4f),
-                            contentColor = Color.White
+                            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            contentColor = Color.White,
+                            focusedContentColor = Color.White
                         ),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
                         border = ClickableSurfaceDefaults.border(
                             focusedBorder = Border(
-                                border = BorderStroke(3.dp, Color.White),
+                                border = BorderStroke(6.dp, MaterialTheme.colorScheme.primary),
                                 shape = CircleShape
                             )
                         ),
@@ -332,13 +333,14 @@ fun MediaViewerScreen(
                         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = Color.White.copy(alpha = 0.3f),
-                            focusedContainerColor = Color.White.copy(alpha = 0.5f),
-                            contentColor = Color.White
+                            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            contentColor = Color.White,
+                            focusedContentColor = Color.White
                         ),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
                         border = ClickableSurfaceDefaults.border(
                             focusedBorder = Border(
-                                border = BorderStroke(3.dp, Color.White),
+                                border = BorderStroke(6.dp, MaterialTheme.colorScheme.primary),
                                 shape = CircleShape
                             )
                         ),
@@ -373,13 +375,14 @@ fun MediaViewerScreen(
                         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = Color.White.copy(alpha = 0.2f),
-                            focusedContainerColor = Color.White.copy(alpha = 0.4f),
-                            contentColor = Color.White
+                            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            contentColor = Color.White,
+                            focusedContentColor = Color.White
                         ),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
                         border = ClickableSurfaceDefaults.border(
                             focusedBorder = Border(
-                                border = BorderStroke(3.dp, Color.White),
+                                border = BorderStroke(6.dp, MaterialTheme.colorScheme.primary),
                                 shape = CircleShape
                             )
                         ),
