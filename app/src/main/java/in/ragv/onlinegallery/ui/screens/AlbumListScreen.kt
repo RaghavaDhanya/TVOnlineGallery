@@ -142,6 +142,7 @@ fun AlbumListScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
                         state = gridState,
+                        contentPadding = PaddingValues(vertical = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
