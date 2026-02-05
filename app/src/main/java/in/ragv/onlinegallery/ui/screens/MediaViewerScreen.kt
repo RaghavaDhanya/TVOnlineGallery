@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.*
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,6 +70,22 @@ fun MediaViewerScreen(
     val backButtonFocusRequester = remember { FocusRequester() }
     var pendingFocusRequest by remember { mutableStateOf<String?>(null) }
     var lastInteractionTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    // Get view to control screen on/off
+    val view = LocalView.current
+
+    // Keep screen on during video playback to prevent screensaver
+    DisposableEffect(currentItem.isVideo, isPlaying) {
+        if (currentItem.isVideo && isPlaying) {
+            view.keepScreenOn = true
+        } else {
+            view.keepScreenOn = false
+        }
+
+        onDispose {
+            view.keepScreenOn = false
+        }
+    }
 
     // Intercept system back button to ensure proper navigation
     BackHandler(onBack = onBackClick)
