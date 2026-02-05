@@ -340,7 +340,7 @@ fun MediaViewerScreen(
             }
         }
 
-        // Center playback controls (for videos)
+        // Center playback controls (for videos) - Vertical layout
         if (currentItem.isVideo) {
             AnimatedVisibility(
                 visible = showControls,
@@ -348,12 +348,12 @@ fun MediaViewerScreen(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.Center)
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    // Previous button
+                    // Previous button (top - D-pad UP)
                     Surface(
                         onClick = {
                             if (currentIndex > 0) {
@@ -400,7 +400,7 @@ fun MediaViewerScreen(
                         }
                     }
 
-                    // Play/Pause button (larger)
+                    // Play/Pause button (center - D-pad CENTER/ENTER)
                     Surface(
                         onClick = {
                             isPlaying = !isPlaying
@@ -446,7 +446,7 @@ fun MediaViewerScreen(
                         }
                     }
 
-                    // Next button
+                    // Next button (bottom - D-pad DOWN)
                     Surface(
                         onClick = {
                             if (currentIndex < mediaItems.size - 1) {
