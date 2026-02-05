@@ -10,7 +10,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -73,6 +78,21 @@ fun AlbumListScreen(
                 )
             }
             else -> {
+                // Focus requester for first album card
+                val firstAlbumFocusRequester = remember { FocusRequester() }
+
+                // Request focus on first album when albums load
+                LaunchedEffect(uiState.albums.isNotEmpty()) {
+                    if (uiState.albums.isNotEmpty()) {
+                        delay(100) // Small delay to ensure compose is ready
+                        try {
+                            firstAlbumFocusRequester.requestFocus()
+                        } catch (e: Exception) {
+                            // Ignore if focus request fails
+                        }
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -92,7 +112,12 @@ fun AlbumListScreen(
                         items(uiState.albums) { album ->
                             AlbumCard(
                                 album = album,
-                                onClick = { onAlbumClick(album) }
+                                onClick = { onAlbumClick(album) },
+                                modifier = if (album == uiState.albums.firstOrNull()) {
+                                    Modifier.focusRequester(firstAlbumFocusRequester)
+                                } else {
+                                    Modifier
+                                }
                             )
                         }
                     }
@@ -106,11 +131,12 @@ fun AlbumListScreen(
 @Composable
 fun AlbumCard(
     album: Album,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .aspectRatio(1.33f)
             .fillMaxWidth()
     ) {
@@ -175,6 +201,20 @@ fun SignInScreen(
     isAuthenticating: Boolean = false,
     error: String? = null
 ) {
+    val signInButtonFocusRequester = remember { FocusRequester() }
+
+    // Request focus on sign-in button when screen loads
+    LaunchedEffect(deviceCodeData == null) {
+        if (deviceCodeData == null && !isAuthenticating) {
+            delay(100) // Small delay to ensure compose is ready
+            try {
+                signInButtonFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Ignore if focus request fails
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -269,7 +309,11 @@ fun SignInScreen(
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
-            Button(onClick = onSignIn, enabled = !isAuthenticating) {
+            Button(
+                onClick = onSignIn,
+                enabled = !isAuthenticating,
+                modifier = Modifier.focusRequester(signInButtonFocusRequester)
+            ) {
                 Text("Sign In with Microsoft")
             }
             if (isAuthenticating) {

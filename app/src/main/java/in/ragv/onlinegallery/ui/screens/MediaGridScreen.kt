@@ -11,8 +11,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -81,6 +85,22 @@ fun MediaGridScreen(
                 }
             }
             else -> {
+                // Focus requesters
+                val backButtonFocusRequester = remember { FocusRequester() }
+                val firstMediaFocusRequester = remember { FocusRequester() }
+
+                // Request focus on first media item when screen loads
+                LaunchedEffect(uiState.mediaItems.isNotEmpty()) {
+                    if (uiState.mediaItems.isNotEmpty()) {
+                        delay(100) // Small delay to ensure compose is ready
+                        try {
+                            firstMediaFocusRequester.requestFocus()
+                        } catch (e: Exception) {
+                            // Ignore if focus request fails
+                        }
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -90,7 +110,10 @@ fun MediaGridScreen(
                         modifier = Modifier.padding(bottom = 32.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Button(onClick = onBackClick) {
+                        Button(
+                            onClick = onBackClick,
+                            modifier = Modifier.focusRequester(backButtonFocusRequester)
+                        ) {
                             Text("Back")
                         }
                         Spacer(modifier = Modifier.width(24.dp))
@@ -108,7 +131,12 @@ fun MediaGridScreen(
                         itemsIndexed(uiState.mediaItems) { index, item ->
                             MediaCard(
                                 mediaItem = item,
-                                onClick = { onMediaClick(item, index) }
+                                onClick = { onMediaClick(item, index) },
+                                modifier = if (index == 0) {
+                                    Modifier.focusRequester(firstMediaFocusRequester)
+                                } else {
+                                    Modifier
+                                }
                             )
                         }
                     }
@@ -122,11 +150,12 @@ fun MediaGridScreen(
 @Composable
 fun MediaCard(
     mediaItem: MediaItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .aspectRatio(1.33f)
             .fillMaxWidth()
     ) {

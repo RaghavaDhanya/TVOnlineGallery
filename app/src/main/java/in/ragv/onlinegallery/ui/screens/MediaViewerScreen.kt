@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onKeyEvent
@@ -58,19 +59,43 @@ fun MediaViewerScreen(
     var videoDuration by remember { mutableStateOf(0L) }
     var mediaPlayerRef by remember { mutableStateOf<Any?>(null) }
 
-    // Focus requesters for video control buttons
+    // Focus requesters for all control buttons
     val previousButtonFocusRequester = remember { FocusRequester() }
     val nextButtonFocusRequester = remember { FocusRequester() }
+    val playPauseButtonFocusRequester = remember { FocusRequester() }
+    val imagePreviousButtonFocusRequester = remember { FocusRequester() }
+    val imageNextButtonFocusRequester = remember { FocusRequester() }
+    val backButtonFocusRequester = remember { FocusRequester() }
     var pendingFocusRequest by remember { mutableStateOf<String?>(null) }
+    var lastInteractionTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
     // Intercept system back button to ensure proper navigation
     BackHandler(onBack = onBackClick)
 
-    // Auto-hide controls after 4 seconds
-    LaunchedEffect(showControls, currentIndex) {
+    // Auto-hide controls after 4 seconds of inactivity
+    LaunchedEffect(showControls, currentIndex, lastInteractionTime) {
         if (showControls) {
-            delay(4000)
+            val timeToWait = 4000L - (System.currentTimeMillis() - lastInteractionTime)
+            if (timeToWait > 0) {
+                delay(timeToWait)
+            }
             showControls = false
+        }
+    }
+
+    // Request initial focus when screen loads
+    LaunchedEffect(Unit) {
+        delay(100) // Small delay to ensure compose is ready
+        showControls = true
+        delay(50)
+        if (currentItem.isVideo) {
+            playPauseButtonFocusRequester.requestFocus()
+        } else {
+            if (currentIndex < mediaItems.size - 1) {
+                imageNextButtonFocusRequester.requestFocus()
+            } else if (currentIndex > 0) {
+                imagePreviousButtonFocusRequester.requestFocus()
+            }
         }
     }
 
@@ -93,6 +118,7 @@ fun MediaViewerScreen(
             .focusable()
             .onKeyEvent { keyEvent ->
                 if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
+                    lastInteractionTime = System.currentTimeMillis()
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
                             if (currentItem.isVideo) {
@@ -244,16 +270,42 @@ fun MediaViewerScreen(
                         .padding(horizontal = 32.dp, vertical = 24.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    androidx.compose.material3.IconButton(
+                    Surface(
                         onClick = { onBackClick() },
-                        modifier = Modifier.size(48.dp)
+                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White.copy(alpha = 0.2f),
+                            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            contentColor = Color.White,
+                            focusedContentColor = Color.White
+                        ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(4.dp, MaterialTheme.colorScheme.primary),
+                                shape = CircleShape
+                            )
+                        ),
+                        modifier = Modifier
+                            .size(48.dp)
+                            .focusRequester(backButtonFocusRequester)
+                            .onFocusChanged { focusState ->
+                                if (focusState.hasFocus) {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            }
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.outline_arrow_back_24),
-                            contentDescription = "Back",
-                            modifier = Modifier.size(32.dp),
-                            tint = Color.White
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.outline_arrow_back_24),
+                                contentDescription = "Back",
+                                modifier = Modifier.size(32.dp),
+                                tint = Color.White
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(16.dp))
@@ -290,6 +342,7 @@ fun MediaViewerScreen(
                                 currentIndex--
                                 isPlaying = true
                                 showControls = true
+                                lastInteractionTime = System.currentTimeMillis()
                             }
                         },
                         enabled = currentIndex > 0,
@@ -310,13 +363,18 @@ fun MediaViewerScreen(
                         modifier = Modifier
                             .size(80.dp)
                             .focusRequester(previousButtonFocusRequester)
+                            .onFocusChanged { focusState ->
+                                if (focusState.hasFocus) {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            }
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.fillMaxSize()
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.baseline_fast_rewind_24),
+                                painter = painterResource(R.drawable.baseline_skip_previous_24),
                                 contentDescription = "Previous",
                                 modifier = Modifier.size(48.dp),
                                 tint = Color.White
@@ -329,6 +387,7 @@ fun MediaViewerScreen(
                         onClick = {
                             isPlaying = !isPlaying
                             showControls = true
+                            lastInteractionTime = System.currentTimeMillis()
                         },
                         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                         colors = ClickableSurfaceDefaults.colors(
@@ -344,7 +403,14 @@ fun MediaViewerScreen(
                                 shape = CircleShape
                             )
                         ),
-                        modifier = Modifier.size(96.dp)
+                        modifier = Modifier
+                            .size(96.dp)
+                            .focusRequester(playPauseButtonFocusRequester)
+                            .onFocusChanged { focusState ->
+                                if (focusState.hasFocus) {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            }
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
@@ -369,6 +435,7 @@ fun MediaViewerScreen(
                                 currentIndex++
                                 isPlaying = true
                                 showControls = true
+                                lastInteractionTime = System.currentTimeMillis()
                             }
                         },
                         enabled = currentIndex < mediaItems.size - 1,
@@ -389,13 +456,18 @@ fun MediaViewerScreen(
                         modifier = Modifier
                             .size(80.dp)
                             .focusRequester(nextButtonFocusRequester)
+                            .onFocusChanged { focusState ->
+                                if (focusState.hasFocus) {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            }
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.fillMaxSize()
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.baseline_fast_forward_24),
+                                painter = painterResource(R.drawable.baseline_skip_next_24),
                                 contentDescription = "Next",
                                 modifier = Modifier.size(48.dp),
                                 tint = Color.White
@@ -414,27 +486,49 @@ fun MediaViewerScreen(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.CenterStart)
             ) {
-                androidx.compose.material3.IconButton(
+                Surface(
                     onClick = {
                         if (currentIndex > 0) {
                             currentIndex--
                             showControls = true
+                            lastInteractionTime = System.currentTimeMillis()
                         }
                     },
+                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.White.copy(alpha = 0.2f),
+                        focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        contentColor = Color.White,
+                        focusedContentColor = Color.White
+                    ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(6.dp, MaterialTheme.colorScheme.primary),
+                            shape = CircleShape
+                        )
+                    ),
                     modifier = Modifier
                         .padding(48.dp)
                         .size(80.dp)
-                        .background(
-                            color = Color.White.copy(alpha = 0.2f),
-                            shape = CircleShape
-                        )
+                        .focusRequester(imagePreviousButtonFocusRequester)
+                        .onFocusChanged { focusState ->
+                            if (focusState.hasFocus) {
+                                lastInteractionTime = System.currentTimeMillis()
+                            }
+                        }
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.baseline_skip_previous_24),
-                        contentDescription = "Previous",
-                        modifier = Modifier.size(48.dp),
-                        tint = Color.White
-                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.baseline_skip_previous_24),
+                            contentDescription = "Previous",
+                            modifier = Modifier.size(48.dp),
+                            tint = Color.White
+                        )
+                    }
                 }
             }
 
@@ -444,27 +538,49 @@ fun MediaViewerScreen(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
-                androidx.compose.material3.IconButton(
+                Surface(
                     onClick = {
                         if (currentIndex < mediaItems.size - 1) {
                             currentIndex++
                             showControls = true
+                            lastInteractionTime = System.currentTimeMillis()
                         }
                     },
+                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.White.copy(alpha = 0.2f),
+                        focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        contentColor = Color.White,
+                        focusedContentColor = Color.White
+                    ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(6.dp, MaterialTheme.colorScheme.primary),
+                            shape = CircleShape
+                        )
+                    ),
                     modifier = Modifier
                         .padding(48.dp)
                         .size(80.dp)
-                        .background(
-                            color = Color.White.copy(alpha = 0.2f),
-                            shape = CircleShape
-                        )
+                        .focusRequester(imageNextButtonFocusRequester)
+                        .onFocusChanged { focusState ->
+                            if (focusState.hasFocus) {
+                                lastInteractionTime = System.currentTimeMillis()
+                            }
+                        }
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.baseline_skip_next_24),
-                        contentDescription = "Next",
-                        modifier = Modifier.size(48.dp),
-                        tint = Color.White
-                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.baseline_skip_next_24),
+                            contentDescription = "Next",
+                            modifier = Modifier.size(48.dp),
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
