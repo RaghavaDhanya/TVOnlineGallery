@@ -85,16 +85,19 @@ fun MediaGridScreen(
                 }
             }
             else -> {
-                // Focus requesters
+                // Focus requesters - create one for each media item index
+                val mediaFocusRequesters = remember(uiState.mediaItems.size) {
+                    List(uiState.mediaItems.size) { FocusRequester() }
+                }
                 val backButtonFocusRequester = remember { FocusRequester() }
-                val firstMediaFocusRequester = remember { FocusRequester() }
 
-                // Request focus on first media item when screen loads
-                LaunchedEffect(uiState.mediaItems.isNotEmpty()) {
+                // Request focus on last viewed media item when screen loads
+                LaunchedEffect(uiState.mediaItems.isNotEmpty(), uiState.lastViewedIndex) {
                     if (uiState.mediaItems.isNotEmpty()) {
                         delay(100) // Small delay to ensure compose is ready
                         try {
-                            firstMediaFocusRequester.requestFocus()
+                            val indexToFocus = uiState.lastViewedIndex.coerceIn(0, uiState.mediaItems.size - 1)
+                            mediaFocusRequesters[indexToFocus].requestFocus()
                         } catch (e: Exception) {
                             // Ignore if focus request fails
                         }
@@ -131,12 +134,11 @@ fun MediaGridScreen(
                         itemsIndexed(uiState.mediaItems) { index, item ->
                             MediaCard(
                                 mediaItem = item,
-                                onClick = { onMediaClick(item, index) },
-                                modifier = if (index == 0) {
-                                    Modifier.focusRequester(firstMediaFocusRequester)
-                                } else {
-                                    Modifier
-                                }
+                                onClick = {
+                                    viewModel.setLastViewedIndex(index)
+                                    onMediaClick(item, index)
+                                },
+                                modifier = Modifier.focusRequester(mediaFocusRequesters[index])
                             )
                         }
                     }

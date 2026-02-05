@@ -24,7 +24,8 @@ data class AlbumUiState(
     val error: String? = null,
     val isAuthenticated: Boolean? = null, // null = checking, true = authenticated, false = not authenticated
     val deviceCodeData: DeviceCodeData? = null,
-    val isAuthenticating: Boolean = false
+    val isAuthenticating: Boolean = false,
+    val lastViewedAlbumIndex: Int = 0
 )
 
 class AlbumViewModel(application: Application) : AndroidViewModel(application) {
@@ -217,5 +218,12 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    /**
+     * Set the last viewed album index for focus restoration
+     */
+    fun setLastViewedAlbumIndex(index: Int) {
+        _uiState.value = _uiState.value.copy(lastViewedAlbumIndex = index)
     }
 }

@@ -14,7 +14,8 @@ data class MediaUiState(
     val mediaItems: List<MediaItem> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    val albumName: String = ""
+    val albumName: String = "",
+    val lastViewedIndex: Int = 0
 )
 
 class MediaViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,5 +54,9 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    fun setLastViewedIndex(index: Int) {
+        _uiState.value = _uiState.value.copy(lastViewedIndex = index)
     }
 }

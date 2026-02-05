@@ -78,15 +78,18 @@ fun AlbumListScreen(
                 )
             }
             else -> {
-                // Focus requester for first album card
-                val firstAlbumFocusRequester = remember { FocusRequester() }
+                // Focus requesters - create one for each album
+                val albumFocusRequesters = remember(uiState.albums.size) {
+                    List(uiState.albums.size) { FocusRequester() }
+                }
 
-                // Request focus on first album when albums load
-                LaunchedEffect(uiState.albums.isNotEmpty()) {
+                // Request focus on last viewed album when albums load
+                LaunchedEffect(uiState.albums.isNotEmpty(), uiState.lastViewedAlbumIndex) {
                     if (uiState.albums.isNotEmpty()) {
                         delay(100) // Small delay to ensure compose is ready
                         try {
-                            firstAlbumFocusRequester.requestFocus()
+                            val indexToFocus = uiState.lastViewedAlbumIndex.coerceIn(0, uiState.albums.size - 1)
+                            albumFocusRequesters[indexToFocus].requestFocus()
                         } catch (e: Exception) {
                             // Ignore if focus request fails
                         }
@@ -109,15 +112,15 @@ fun AlbumListScreen(
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
-                        items(uiState.albums) { album ->
+                        items(uiState.albums.size) { index ->
+                            val album = uiState.albums[index]
                             AlbumCard(
                                 album = album,
-                                onClick = { onAlbumClick(album) },
-                                modifier = if (album == uiState.albums.firstOrNull()) {
-                                    Modifier.focusRequester(firstAlbumFocusRequester)
-                                } else {
-                                    Modifier
-                                }
+                                onClick = {
+                                    viewModel.setLastViewedAlbumIndex(index)
+                                    onAlbumClick(album)
+                                },
+                                modifier = Modifier.focusRequester(albumFocusRequesters[index])
                             )
                         }
                     }
