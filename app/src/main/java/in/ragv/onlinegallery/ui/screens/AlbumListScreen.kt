@@ -12,7 +12,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import kotlinx.coroutines.delay
@@ -23,6 +27,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.request.CachePolicy
+import androidx.compose.ui.platform.LocalContext
 import `in`.ragv.onlinegallery.data.models.Album
 import `in`.ragv.onlinegallery.ui.viewmodel.AlbumViewModel
 import `in`.ragv.onlinegallery.ui.viewmodel.DeviceCodeData
@@ -37,6 +44,32 @@ fun AlbumListScreen(
 
     // Preserve scroll position across navigation and configuration changes
     val gridState = rememberLazyGridState()
+
+    // Refresh albums when app resumes from background
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        var wasPaused = false
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    wasPaused = true
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    // Only refresh if we were actually paused (came from background)
+                    if (wasPaused) {
+                        android.util.Log.d("AlbumListScreen", "App resumed from background - refreshing albums")
+                        viewModel.refreshAlbums()
+                        wasPaused = false
+                    }
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -146,7 +179,12 @@ fun AlbumCard(
         Box {
             if (album.thumbnailUrl != null) {
                 AsyncImage(
-                    model = album.thumbnailUrl,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(album.thumbnailUrl)
+                        .crossfade(150) // Fast crossfade for smooth transition
+                        .memoryCachePolicy(CachePolicy.ENABLED) // Force memory cache
+                        .diskCachePolicy(CachePolicy.ENABLED) // Keep disk cache
+                        .build(),
                     contentDescription = album.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

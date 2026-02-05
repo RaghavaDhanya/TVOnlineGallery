@@ -173,11 +173,20 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Track if albums have been loaded to prevent unnecessary reloads
+    private var albumsLoaded = false
+
     /**
      * Load albums from OneDrive
      * First shows cached data (if available), then updates with fresh data from API
      */
     fun loadAlbums() {
+        // Skip reload if we already have albums loaded
+        if (albumsLoaded && _uiState.value.albums.isNotEmpty()) {
+            android.util.Log.d("AlbumViewModel", "Skipping reload - already have albums")
+            return
+        }
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
@@ -187,6 +196,7 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
                         albums = albums,
                         isLoading = false
                     )
+                    albumsLoaded = true
                     if (isFirstEmission) {
                         android.util.Log.d("AlbumViewModel", "First emission (cached or fresh): ${albums.size} albums")
                         isFirstEmission = false
@@ -201,6 +211,14 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    /**
+     * Force refresh albums from API
+     */
+    fun refreshAlbums() {
+        albumsLoaded = false
+        loadAlbums()
     }
 
     /**

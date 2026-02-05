@@ -12,16 +12,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.request.CachePolicy
 import `in`.ragv.onlinegallery.data.models.MediaItem
 import `in`.ragv.onlinegallery.ui.viewmodel.MediaViewModel
 import androidx.compose.material3.Icon
@@ -47,14 +54,40 @@ fun MediaGridScreen(
         viewModel.loadMediaItems(albumId, albumName)
     }
 
+    // Refresh media items when app resumes from background
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        var wasPaused = false
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    wasPaused = true
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    // Only refresh if we were actually paused (came from background)
+                    if (wasPaused) {
+                        android.util.Log.d("MediaGridScreen", "App resumed from background - refreshing media items")
+                        viewModel.refreshMediaItems()
+                        wasPaused = false
+                    }
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            uiState.isLoading -> {
+            uiState.isLoading && uiState.mediaItems.isEmpty() -> {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
-            uiState.error != null -> {
+            uiState.error != null && uiState.mediaItems.isEmpty() -> {
                 Column(
                     modifier = Modifier.align(Alignment.Center),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -163,7 +196,12 @@ fun MediaCard(
     ) {
         Box {
             AsyncImage(
-                model = mediaItem.thumbnailUrl ?: mediaItem.url,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(mediaItem.thumbnailUrl ?: mediaItem.url)
+                    .crossfade(150) // Fast crossfade for smooth transition
+                    .memoryCachePolicy(CachePolicy.ENABLED) // Force memory cache
+                    .diskCachePolicy(CachePolicy.ENABLED) // Keep disk cache
+                    .build(),
                 contentDescription = mediaItem.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

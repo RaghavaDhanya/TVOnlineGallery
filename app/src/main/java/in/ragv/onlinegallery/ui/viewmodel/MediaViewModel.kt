@@ -25,7 +25,20 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(MediaUiState())
     val uiState: StateFlow<MediaUiState> = _uiState.asStateFlow()
 
+    // Track the currently loaded album ID to prevent unnecessary reloads
+    private var loadedAlbumId: String? = null
+    private var loadedAlbumName: String = ""
+
     fun loadMediaItems(albumId: String, albumName: String) {
+        // Skip reload if we already have data for this album
+        if (loadedAlbumId == albumId && _uiState.value.mediaItems.isNotEmpty()) {
+            android.util.Log.d("MediaViewModel", "Skipping reload - already have data for album $albumId")
+            return
+        }
+
+        loadedAlbumId = albumId
+        loadedAlbumName = albumName
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
@@ -58,5 +71,15 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setLastViewedIndex(index: Int) {
         _uiState.value = _uiState.value.copy(lastViewedIndex = index)
+    }
+
+    /**
+     * Force refresh the current album data from API
+     */
+    fun refreshMediaItems() {
+        val albumId = loadedAlbumId ?: return
+        val albumName = loadedAlbumName
+        loadedAlbumId = null // Clear cache flag to force reload
+        loadMediaItems(albumId, albumName)
     }
 }
