@@ -36,15 +36,27 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        loadedAlbumId = albumId
-        loadedAlbumName = albumName
-
-        viewModelScope.launch {
+        // If switching to a different album, clear old data immediately and show loading
+        if (loadedAlbumId != albumId) {
+            _uiState.value = _uiState.value.copy(
+                mediaItems = emptyList(),
+                lastViewedIndex = 0,
+                isLoading = true,
+                error = null,
+                albumName = albumName
+            )
+        } else {
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
                 error = null,
                 albumName = albumName
             )
+        }
+
+        loadedAlbumId = albumId
+        loadedAlbumName = albumName
+
+        viewModelScope.launch {
             try {
                 repository.initialize()
                 var isFirstEmission = true
