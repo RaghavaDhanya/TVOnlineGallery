@@ -51,7 +51,7 @@ import org.videolan.libvlc.util.VLCVideoLayout
 fun MediaViewerScreen(
     mediaItems: List<MediaItem>,
     initialIndex: Int,
-    onBackClick: () -> Unit
+    onBackClick: (finalIndex: Int) -> Unit
 ) {
     var currentIndex by remember { mutableStateOf(initialIndex) }
     val currentItem = mediaItems[currentIndex]
@@ -88,7 +88,7 @@ fun MediaViewerScreen(
     }
 
     // Intercept system back button to ensure proper navigation
-    BackHandler(onBack = onBackClick)
+    BackHandler(onBack = { onBackClick(currentIndex) })
 
     // Auto-hide controls after 4 seconds of inactivity
     LaunchedEffect(showControls, currentIndex, lastInteractionTime) {
@@ -289,7 +289,7 @@ fun MediaViewerScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        onClick = { onBackClick() },
+                        onClick = { onBackClick(currentIndex) },
                         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = Color.White.copy(alpha = 0.2f),

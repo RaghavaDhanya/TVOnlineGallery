@@ -87,7 +87,10 @@ fun NavGraph(
                 MediaViewerScreen(
                     mediaItems = mediaItems,
                     initialIndex = mediaIndex,
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { finalIndex ->
+                        mediaViewModel.setLastViewedIndex(finalIndex)
+                        navController.popBackStack()
+                    }
                 )
             }
         }
