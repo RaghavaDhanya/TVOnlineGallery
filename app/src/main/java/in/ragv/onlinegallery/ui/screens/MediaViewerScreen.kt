@@ -40,6 +40,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.shape.CircleShape
 import `in`.ragv.onlinegallery.R
 import `in`.ragv.onlinegallery.data.models.MediaItem
+import `in`.ragv.onlinegallery.ui.theme.ComponentSizes
+import `in`.ragv.onlinegallery.ui.theme.OverlayColors
+import `in`.ragv.onlinegallery.ui.theme.Spacing
+import `in`.ragv.onlinegallery.ui.theme.TvComponentDefaults
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
@@ -276,7 +280,7 @@ fun MediaViewerScreen(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.7f),
+                                OverlayColors.scrimHeavy,
                                 Color.Transparent
                             )
                         )
@@ -285,27 +289,17 @@ fun MediaViewerScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 32.dp, vertical = 24.dp),
+                        .padding(horizontal = Spacing.ExtraLarge, vertical = Spacing.Large),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
                         onClick = { onBackClick(currentIndex) },
-                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                        colors = ClickableSurfaceDefaults.colors(
-                            containerColor = Color.White.copy(alpha = 0.2f),
-                            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                            contentColor = Color.White,
-                            focusedContentColor = Color.White
-                        ),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
-                        border = ClickableSurfaceDefaults.border(
-                            focusedBorder = Border(
-                                border = BorderStroke(4.dp, MaterialTheme.colorScheme.primary),
-                                shape = CircleShape
-                            )
-                        ),
+                        shape = TvComponentDefaults.circleShape(),
+                        colors = TvComponentDefaults.overlayButtonColors(),
+                        scale = TvComponentDefaults.buttonScaleSmall(),
+                        border = TvComponentDefaults.buttonBorderThin(),
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(ComponentSizes.ButtonSmall)
                             .focusRequester(backButtonFocusRequester)
                             .onFocusChanged { focusState ->
                                 if (focusState.hasFocus) {
@@ -320,18 +314,18 @@ fun MediaViewerScreen(
                             Icon(
                                 painter = painterResource(R.drawable.outline_arrow_back_24),
                                 contentDescription = "Back",
-                                modifier = Modifier.size(32.dp),
-                                tint = Color.White
+                                modifier = Modifier.size(ComponentSizes.IconSmall),
+                                tint = OverlayColors.surface
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(Spacing.Medium))
 
                     Text(
                         text = currentItem.name,
                         style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
+                        color = OverlayColors.surface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -364,22 +358,12 @@ fun MediaViewerScreen(
                             }
                         },
                         enabled = currentIndex > 0,
-                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                        colors = ClickableSurfaceDefaults.colors(
-                            containerColor = Color.White.copy(alpha = 0.2f),
-                            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                            contentColor = Color.White,
-                            focusedContentColor = Color.White
-                        ),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
-                        border = ClickableSurfaceDefaults.border(
-                            focusedBorder = Border(
-                                border = BorderStroke(6.dp, MaterialTheme.colorScheme.primary),
-                                shape = CircleShape
-                            )
-                        ),
+                        shape = TvComponentDefaults.circleShape(),
+                        colors = TvComponentDefaults.overlayButtonColors(),
+                        scale = TvComponentDefaults.buttonScale(),
+                        border = TvComponentDefaults.buttonBorder(),
                         modifier = Modifier
-                            .size(80.dp)
+                            .size(ComponentSizes.ButtonMedium)
                             .focusRequester(previousButtonFocusRequester)
                             .onFocusChanged { focusState ->
                                 if (focusState.hasFocus) {
@@ -394,8 +378,8 @@ fun MediaViewerScreen(
                             Icon(
                                 painter = painterResource(R.drawable.baseline_skip_previous_24),
                                 contentDescription = "Previous",
-                                modifier = Modifier.size(48.dp),
-                                tint = Color.White
+                                modifier = Modifier.size(ComponentSizes.IconMedium),
+                                tint = OverlayColors.surface
                             )
                         }
                     }
@@ -407,22 +391,12 @@ fun MediaViewerScreen(
                             showControls = true
                             lastInteractionTime = System.currentTimeMillis()
                         },
-                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                        colors = ClickableSurfaceDefaults.colors(
-                            containerColor = Color.White.copy(alpha = 0.3f),
-                            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                            contentColor = Color.White,
-                            focusedContentColor = Color.White
-                        ),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
-                        border = ClickableSurfaceDefaults.border(
-                            focusedBorder = Border(
-                                border = BorderStroke(6.dp, MaterialTheme.colorScheme.primary),
-                                shape = CircleShape
-                            )
-                        ),
+                        shape = TvComponentDefaults.circleShape(),
+                        colors = TvComponentDefaults.overlayButtonColorsPrimary(),
+                        scale = TvComponentDefaults.buttonScale(),
+                        border = TvComponentDefaults.buttonBorder(),
                         modifier = Modifier
-                            .size(96.dp)
+                            .size(ComponentSizes.ButtonLarge)
                             .focusRequester(playPauseButtonFocusRequester)
                             .onFocusChanged { focusState ->
                                 if (focusState.hasFocus) {
@@ -440,8 +414,8 @@ fun MediaViewerScreen(
                                     else R.drawable.baseline_play_circle_filled_24
                                 ),
                                 contentDescription = if (isPlaying) "Pause" else "Play",
-                                modifier = Modifier.size(56.dp),
-                                tint = Color.White
+                                modifier = Modifier.size(ComponentSizes.IconLarge),
+                                tint = OverlayColors.surface
                             )
                         }
                     }
@@ -457,22 +431,12 @@ fun MediaViewerScreen(
                             }
                         },
                         enabled = currentIndex < mediaItems.size - 1,
-                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                        colors = ClickableSurfaceDefaults.colors(
-                            containerColor = Color.White.copy(alpha = 0.2f),
-                            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                            contentColor = Color.White,
-                            focusedContentColor = Color.White
-                        ),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
-                        border = ClickableSurfaceDefaults.border(
-                            focusedBorder = Border(
-                                border = BorderStroke(6.dp, MaterialTheme.colorScheme.primary),
-                                shape = CircleShape
-                            )
-                        ),
+                        shape = TvComponentDefaults.circleShape(),
+                        colors = TvComponentDefaults.overlayButtonColors(),
+                        scale = TvComponentDefaults.buttonScale(),
+                        border = TvComponentDefaults.buttonBorder(),
                         modifier = Modifier
-                            .size(80.dp)
+                            .size(ComponentSizes.ButtonMedium)
                             .focusRequester(nextButtonFocusRequester)
                             .onFocusChanged { focusState ->
                                 if (focusState.hasFocus) {
@@ -487,8 +451,8 @@ fun MediaViewerScreen(
                             Icon(
                                 painter = painterResource(R.drawable.baseline_skip_next_24),
                                 contentDescription = "Next",
-                                modifier = Modifier.size(48.dp),
-                                tint = Color.White
+                                modifier = Modifier.size(ComponentSizes.IconMedium),
+                                tint = OverlayColors.surface
                             )
                         }
                     }
@@ -618,7 +582,7 @@ fun MediaViewerScreen(
                             Brush.verticalGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    Color.Black.copy(alpha = 0.7f)
+                                    OverlayColors.scrimHeavy
                                 )
                             )
                         )
@@ -626,15 +590,15 @@ fun MediaViewerScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 48.dp, vertical = 24.dp)
+                            .padding(horizontal = Spacing.ExtraExtraLarge, vertical = Spacing.Large)
                     ) {
                         // Time display
                         if (videoDuration > 0) {
                             Text(
                                 text = "${formatTime(videoPosition)} - ${formatTime(videoDuration)}",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = Color.White,
-                                modifier = Modifier.padding(bottom = 12.dp)
+                                color = OverlayColors.surface,
+                                modifier = Modifier.padding(bottom = Spacing.Small + Spacing.ExtraSmall)
                             )
                         }
 
@@ -643,9 +607,9 @@ fun MediaViewerScreen(
                             progress = { if (videoDuration > 0) videoPosition.toFloat() / videoDuration else 0f },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(6.dp),
-                            color = Color.White,
-                            trackColor = Color.White.copy(alpha = 0.3f)
+                                .height(ComponentSizes.BorderThick),
+                            color = OverlayColors.surface,
+                            trackColor = OverlayColors.progressTrack
                         )
                     }
                 }
@@ -665,7 +629,7 @@ fun MediaViewerScreen(
                             Brush.verticalGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    Color.Black.copy(alpha = 0.7f)
+                                    OverlayColors.scrimHeavy
                                 )
                             )
                         )
@@ -673,12 +637,12 @@ fun MediaViewerScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 48.dp, vertical = 24.dp)
+                            .padding(horizontal = Spacing.ExtraExtraLarge, vertical = Spacing.Large)
                     ) {
                         Text(
                             text = "${currentIndex + 1} of ${mediaItems.size}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White
+                            color = OverlayColors.surface
                         )
                     }
                 }
@@ -836,22 +800,22 @@ fun VLCVideoPlayer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f)),
+                    .background(OverlayColors.scrimLight),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
                 ) {
                     androidx.compose.material3.CircularProgressIndicator(
-                        modifier = Modifier.size(64.dp),
-                        color = Color.White,
-                        strokeWidth = 6.dp
+                        modifier = Modifier.size(ComponentSizes.IconExtraLarge),
+                        color = OverlayColors.surface,
+                        strokeWidth = ComponentSizes.BorderThick
                     )
                     Text(
                         text = "Buffering...",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
+                        color = OverlayColors.surface
                     )
                 }
             }

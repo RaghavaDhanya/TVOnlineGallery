@@ -33,6 +33,9 @@ import androidx.compose.ui.platform.LocalContext
 import `in`.ragv.onlinegallery.data.models.Album
 import `in`.ragv.onlinegallery.ui.viewmodel.AlbumViewModel
 import `in`.ragv.onlinegallery.ui.viewmodel.DeviceCodeData
+import `in`.ragv.onlinegallery.ui.theme.GridConfig
+import `in`.ragv.onlinegallery.ui.theme.OverlayColors
+import `in`.ragv.onlinegallery.ui.theme.Spacing
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -97,7 +100,7 @@ fun AlbumListScreen(
                         text = "Error: ${uiState.error}",
                         style = MaterialTheme.typography.bodyLarge
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(Spacing.Medium))
                     Button(onClick = { viewModel.loadAlbums() }) {
                         Text("Retry")
                     }
@@ -132,19 +135,19 @@ fun AlbumListScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(48.dp)
+                        .padding(Spacing.ExtraExtraLarge)
                 ) {
                     Text(
                         text = "Albums",
                         style = MaterialTheme.typography.displayMedium,
-                        modifier = Modifier.padding(bottom = 32.dp)
+                        modifier = Modifier.padding(bottom = Spacing.ExtraLarge)
                     )
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
+                        columns = GridCells.Fixed(GridConfig.AlbumColumns),
                         state = gridState,
-                        contentPadding = PaddingValues(vertical = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp)
+                        contentPadding = PaddingValues(vertical = Spacing.Medium),
+                        horizontalArrangement = Arrangement.spacedBy(GridConfig.AlbumHorizontalSpacing),
+                        verticalArrangement = Arrangement.spacedBy(GridConfig.AlbumVerticalSpacing)
                     ) {
                         items(uiState.albums.size) { index ->
                             val album = uiState.albums[index]
@@ -209,7 +212,7 @@ fun AlbumCard(
                         Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.8f)
+                                OverlayColors.scrimExtraHeavy
                             )
                         )
                     )
@@ -218,17 +221,17 @@ fun AlbumCard(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(Spacing.Medium)
             ) {
                 Text(
                     text = album.name,
                     style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
+                    color = OverlayColors.surface
                 )
                 Text(
                     text = "${album.itemCount} items",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.9f)
+                    color = OverlayColors.surfaceHeavy
                 )
             }
         }
@@ -260,21 +263,21 @@ fun SignInScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(48.dp),
+            .padding(Spacing.ExtraExtraLarge),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = "Online Gallery",
             style = MaterialTheme.typography.displayLarge,
-            modifier = Modifier.padding(bottom = 32.dp)
+            modifier = Modifier.padding(bottom = Spacing.ExtraLarge)
         )
 
         // Show error if present
         if (error != null) {
             Box(
                 modifier = Modifier
-                    .padding(16.dp)
+                    .padding(Spacing.Medium)
                     .background(
                         color = MaterialTheme.colorScheme.errorContainer,
                         shape = MaterialTheme.shapes.medium
@@ -287,41 +290,41 @@ fun SignInScreen(
                     modifier = Modifier.padding(24.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Spacing.Medium))
         }
 
         if (deviceCodeData != null) {
             // Show device code and instructions
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(32.dp)
+                modifier = Modifier.padding(Spacing.ExtraLarge)
             ) {
                 Text(
                     text = "To sign in, follow these steps:",
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    modifier = Modifier.padding(bottom = Spacing.Large)
                 )
 
                 Text(
                     text = "1. On your phone or computer, visit:",
                     style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = Spacing.Small)
                 )
                 Text(
                     text = deviceCodeData.verificationUrl,
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    modifier = Modifier.padding(bottom = Spacing.Large)
                 )
 
                 Text(
                     text = "2. Enter this code:",
                     style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = Spacing.Small)
                 )
                 Box(
                     modifier = Modifier
-                        .padding(16.dp)
+                        .padding(Spacing.Medium)
                         .background(
                             color = MaterialTheme.colorScheme.primaryContainer,
                             shape = MaterialTheme.shapes.medium
@@ -334,7 +337,7 @@ fun SignInScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(Spacing.Large))
 
                 if (isAuthenticating) {
                     CircularProgressIndicator(modifier = Modifier.padding(16.dp))

@@ -32,6 +32,10 @@ import coil.request.CachePolicy
 import `in`.ragv.onlinegallery.data.models.MediaItem
 import `in`.ragv.onlinegallery.ui.viewmodel.MediaViewModel
 import androidx.compose.material3.Icon
+import `in`.ragv.onlinegallery.ui.theme.ComponentSizes
+import `in`.ragv.onlinegallery.ui.theme.GridConfig
+import `in`.ragv.onlinegallery.ui.theme.OverlayColors
+import `in`.ragv.onlinegallery.ui.theme.Spacing
 import androidx.compose.ui.res.painterResource
 import `in`.ragv.onlinegallery.R
 import androidx.compose.ui.graphics.Color
@@ -140,10 +144,10 @@ fun MediaGridScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(48.dp)
+                        .padding(Spacing.ExtraExtraLarge)
                 ) {
                     Row(
-                        modifier = Modifier.padding(bottom = 32.dp),
+                        modifier = Modifier.padding(bottom = Spacing.ExtraLarge),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
@@ -152,18 +156,18 @@ fun MediaGridScreen(
                         ) {
                             Text("Back")
                         }
-                        Spacer(modifier = Modifier.width(24.dp))
+                        Spacer(modifier = Modifier.width(Spacing.Large))
                         Text(
                             text = uiState.albumName,
                             style = MaterialTheme.typography.displayMedium
                         )
                     }
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
+                        columns = GridCells.Fixed(GridConfig.MediaColumns),
                         state = gridState,
-                        contentPadding = PaddingValues(vertical = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        contentPadding = PaddingValues(vertical = Spacing.Medium),
+                        horizontalArrangement = Arrangement.spacedBy(GridConfig.MediaHorizontalSpacing),
+                        verticalArrangement = Arrangement.spacedBy(GridConfig.MediaVerticalSpacing)
                     ) {
                         itemsIndexed(uiState.mediaItems) { index, item ->
                             MediaCard(
@@ -211,9 +215,9 @@ fun MediaCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(64.dp)
+                        .size(ComponentSizes.IconExtraLarge)
                         .background(
-                            color = Color.Black.copy(alpha = 0.5f),
+                            color = OverlayColors.scrimMedium,
                             shape = androidx.compose.foundation.shape.CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -221,8 +225,8 @@ fun MediaCard(
                     Icon(
                         painter = painterResource(R.drawable.baseline_play_circle_filled_24),
                         contentDescription = "Video",
-                        modifier = Modifier.size(48.dp),
-                        tint = Color.White
+                        modifier = Modifier.size(ComponentSizes.IconMedium),
+                        tint = OverlayColors.surface
                     )
                 }
             }
