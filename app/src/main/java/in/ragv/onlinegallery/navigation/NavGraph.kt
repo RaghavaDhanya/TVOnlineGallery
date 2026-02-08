@@ -90,6 +90,12 @@ fun NavGraph(
                     onBackClick = { finalIndex ->
                         mediaViewModel.setLastViewedIndex(finalIndex)
                         navController.popBackStack()
+                    },
+                    onSaveVideoPosition = { videoId, position, duration ->
+                        mediaViewModel.saveVideoPosition(videoId, position, duration)
+                    },
+                    onGetVideoPosition = { videoId ->
+                        mediaViewModel.getVideoPosition(videoId)
                     }
                 )
             }

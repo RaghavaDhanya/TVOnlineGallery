@@ -55,7 +55,9 @@ import org.videolan.libvlc.util.VLCVideoLayout
 fun MediaViewerScreen(
     mediaItems: List<MediaItem>,
     initialIndex: Int,
-    onBackClick: (finalIndex: Int) -> Unit
+    onBackClick: (finalIndex: Int) -> Unit,
+    onSaveVideoPosition: (videoId: String, position: Long, duration: Long) -> Unit,
+    onGetVideoPosition: (videoId: String) -> Long
 ) {
     var currentIndex by remember { mutableStateOf(initialIndex) }
     val currentItem = mediaItems[currentIndex]
@@ -64,6 +66,15 @@ fun MediaViewerScreen(
     var videoPosition by remember { mutableStateOf(0L) }
     var videoDuration by remember { mutableStateOf(0L) }
     var mediaPlayerRef by remember { mutableStateOf<Any?>(null) }
+
+    // Load saved position for current video
+    val savedPosition = remember(currentItem.id, currentItem.isVideo) {
+        if (currentItem.isVideo) {
+            onGetVideoPosition(currentItem.id)
+        } else {
+            0L
+        }
+    }
 
     // Focus requesters for all control buttons
     val previousButtonFocusRequester = remember { FocusRequester() }
@@ -92,7 +103,30 @@ fun MediaViewerScreen(
     }
 
     // Intercept system back button to ensure proper navigation
-    BackHandler(onBack = { onBackClick(currentIndex) })
+    BackHandler(onBack = {
+        // Save video position before leaving
+        if (currentItem.isVideo && videoDuration > 0) {
+            onSaveVideoPosition(currentItem.id, videoPosition, videoDuration)
+        }
+        onBackClick(currentIndex)
+    })
+
+    // Save video position when leaving the screen
+    DisposableEffect(currentItem.id) {
+        onDispose {
+            if (currentItem.isVideo && videoDuration > 0) {
+                onSaveVideoPosition(currentItem.id, videoPosition, videoDuration)
+            }
+        }
+    }
+
+    // Periodically save video position while playing (every 10 seconds)
+    LaunchedEffect(currentItem.id, isPlaying, videoPosition) {
+        if (currentItem.isVideo && isPlaying && videoDuration > 0) {
+            delay(10000) // Wait 10 seconds
+            onSaveVideoPosition(currentItem.id, videoPosition, videoDuration)
+        }
+    }
 
     // Auto-hide controls after 4 seconds of inactivity
     LaunchedEffect(showControls, currentIndex, lastInteractionTime) {
@@ -233,6 +267,7 @@ fun MediaViewerScreen(
                 url = currentItem.url,
                 modifier = Modifier.fillMaxSize(),
                 isPlaying = isPlaying,
+                initialPosition = savedPosition,
                 onPlayingStateChange = { isPlaying = it },
                 onPositionUpdate = { position, duration ->
                     videoPosition = position
@@ -667,6 +702,7 @@ fun VLCVideoPlayer(
     url: String,
     modifier: Modifier = Modifier,
     isPlaying: Boolean = true,
+    initialPosition: Long = 0L,
     onPlayingStateChange: (Boolean) -> Unit = {},
     onPositionUpdate: (position: Long, duration: Long) -> Unit = { _, _ -> },
     onMediaPlayerCreated: (MediaPlayer?) -> Unit = {}
@@ -720,9 +756,13 @@ fun VLCVideoPlayer(
         }
     }
 
+    // Track if we've already seeked to initial position
+    var hasSeekedToInitialPosition by remember(url) { mutableStateOf(false) }
+
     // Update media when URL changes
     LaunchedEffect(url) {
         android.util.Log.d("VLCVideoPlayer", "Loading video URL: $url")
+        hasSeekedToInitialPosition = false
         mediaPlayer?.let { player ->
             try {
                 val media = Media(libVLC, Uri.parse(url))
@@ -738,6 +778,15 @@ fun VLCVideoPlayer(
 
                 player.play()
                 onPlayingStateChange(true)
+
+                // Seek to saved position if available
+                if (initialPosition > 0 && !hasSeekedToInitialPosition) {
+                    android.util.Log.d("VLCVideoPlayer", "Seeking to saved position: $initialPosition")
+                    // Wait a bit for the media to start loading
+                    kotlinx.coroutines.delay(1000)
+                    player.time = initialPosition
+                    hasSeekedToInitialPosition = true
+                }
             } catch (e: Exception) {
                 android.util.Log.e("VLCVideoPlayer", "Error setting media", e)
             }

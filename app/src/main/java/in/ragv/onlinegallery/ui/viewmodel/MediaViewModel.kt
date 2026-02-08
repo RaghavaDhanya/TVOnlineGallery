@@ -3,6 +3,7 @@ package `in`.ragv.onlinegallery.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import `in`.ragv.onlinegallery.data.cache.VideoPositionManager
 import `in`.ragv.onlinegallery.data.models.MediaItem
 import `in`.ragv.onlinegallery.data.repository.OneDriveRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,7 @@ data class MediaUiState(
 class MediaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = OneDriveRepository(application)
+    private val videoPositionManager = VideoPositionManager(application)
 
     private val _uiState = MutableStateFlow(MediaUiState())
     val uiState: StateFlow<MediaUiState> = _uiState.asStateFlow()
@@ -93,5 +95,26 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
         val albumName = loadedAlbumName
         loadedAlbumId = null // Clear cache flag to force reload
         loadMediaItems(albumId, albumName)
+    }
+
+    /**
+     * Save video playback position
+     */
+    fun saveVideoPosition(videoId: String, position: Long, duration: Long) {
+        videoPositionManager.savePosition(videoId, position, duration)
+    }
+
+    /**
+     * Get saved video playback position
+     */
+    fun getVideoPosition(videoId: String): Long {
+        return videoPositionManager.getPosition(videoId)
+    }
+
+    /**
+     * Clear saved video position (when video is completed or user wants to restart)
+     */
+    fun clearVideoPosition(videoId: String) {
+        videoPositionManager.clearPosition(videoId)
     }
 }
