@@ -2,6 +2,8 @@
 
 An Android TV gallery application that displays photos and videos from OneDrive. Each folder in your designated OneDrive directory becomes an album.
 
+> **Note**: This app was vibe-coded. Use at your own risk.
+
 ## Features
 
 - Browse albums (folders) from OneDrive
@@ -32,6 +34,9 @@ app/src/main/java/in/ragv/onlinegallery/
 │   │   └── GraphApiClient.kt      # HTTP client for Graph API
 │   ├── auth/
 │   │   └── AuthManager.kt         # Device Code Flow implementation
+│   ├── cache/
+│   │   ├── CacheManager.kt        # Album/media caching
+│   │   └── VideoPositionManager.kt # Remember video pause positions
 │   ├── models/
 │   │   ├── Album.kt               # Album data model
 │   │   └── MediaItem.kt           # Media item data model
@@ -323,7 +328,7 @@ Edit `GraphApiClient.kt` (lines 28-30):
 
 ## License
 
-[Your License Here]
+This project was mostly vibe-coded using AI (Claude). The licensing of AI-generated code is still an evolving and unclear area, so this project is currently unlicensed. Use at your own discretion.
 
 ## Support
 
