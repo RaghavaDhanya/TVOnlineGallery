@@ -2,7 +2,7 @@
 
 An Android TV gallery application that displays photos and videos from OneDrive. Each folder in your designated OneDrive directory becomes an album.
 
-> **Note**: This app was vibe-coded. Use at your own risk.
+> **Note**: This app was vibe-coded for personal use. Use at your own risk.
 
 ## Features
 
