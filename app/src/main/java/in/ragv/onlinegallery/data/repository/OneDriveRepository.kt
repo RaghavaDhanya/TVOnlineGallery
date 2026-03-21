@@ -2,6 +2,7 @@ package `in`.ragv.onlinegallery.data.repository
 
 import android.content.Context
 import android.util.Log
+import `in`.ragv.onlinegallery.data.api.DriveItemListResponse
 import `in`.ragv.onlinegallery.data.api.DriveItemResponse
 import `in`.ragv.onlinegallery.data.api.GraphApiClient
 import `in`.ragv.onlinegallery.data.auth.AuthManager
@@ -149,19 +150,13 @@ class OneDriveRepository(context: Context) {
                 return@flow
             }
 
-            // Get children of the root folder path
-            val result = client.getFolderChildren(ROOT_FOLDER_PATH)
-
-            if (result.isFailure) {
-                Log.e(TAG, "Failed to get albums", result.exceptionOrNull())
-                if (cachedAlbums == null) {
-                    emit(emptyList())
-                }
-                return@flow
+            // Get all children of the root folder path (with pagination)
+            val allItems = fetchAllPages(client.getFolderChildren(ROOT_FOLDER_PATH)) { nextLink ->
+                client.fetchNextPage(nextLink)
             }
 
-            val response = result.getOrNull()
-            if (response == null) {
+            if (allItems == null) {
+                Log.e(TAG, "Failed to get albums")
                 if (cachedAlbums == null) {
                     emit(emptyList())
                 }
@@ -169,7 +164,7 @@ class OneDriveRepository(context: Context) {
             }
 
             // Filter for folders only and map to Album objects
-            val folders = response.items.filter { it.folder != null }
+            val folders = allItems.filter { it.folder != null }
 
             // For each folder, try to get a thumbnail from cached media or API
             val freshAlbums = folders.map { item ->
@@ -220,19 +215,13 @@ class OneDriveRepository(context: Context) {
                 return@flow
             }
 
-            // Get children of the folder
-            val result = client.getFolderChildrenById(albumId)
-
-            if (result.isFailure) {
-                Log.e(TAG, "Failed to get media items", result.exceptionOrNull())
-                if (cachedMedia == null) {
-                    emit(emptyList())
-                }
-                return@flow
+            // Get all children of the folder (with pagination)
+            val allItems = fetchAllPages(client.getFolderChildrenById(albumId)) { nextLink ->
+                client.fetchNextPage(nextLink)
             }
 
-            val response = result.getOrNull()
-            if (response == null) {
+            if (allItems == null) {
+                Log.e(TAG, "Failed to get media items")
                 if (cachedMedia == null) {
                     emit(emptyList())
                 }
@@ -240,7 +229,7 @@ class OneDriveRepository(context: Context) {
             }
 
             // Filter for media files and map to MediaItem objects
-            val freshMedia = response.items
+            val freshMedia = allItems
                 .filter { it.file != null && isMediaFile(it) } // Only media files
                 .mapNotNull { item ->
                     // downloadUrl should be included in the response now
@@ -334,6 +323,36 @@ class OneDriveRepository(context: Context) {
         }
 
         return null
+    }
+
+    /**
+     * Follow pagination to collect all items across pages
+     */
+    private suspend fun fetchAllPages(
+        firstResult: Result<DriveItemListResponse>,
+        fetchNext: suspend (String) -> Result<DriveItemListResponse>
+    ): List<DriveItemResponse>? {
+        if (firstResult.isFailure) return null
+        val firstResponse = firstResult.getOrNull() ?: return null
+
+        val allItems = mutableListOf<DriveItemResponse>()
+        allItems.addAll(firstResponse.items)
+
+        var nextLink = firstResponse.nextLink
+        while (nextLink != null) {
+            Log.d(TAG, "Fetching next page: $nextLink")
+            val nextResult = fetchNext(nextLink)
+            if (nextResult.isFailure) {
+                Log.e(TAG, "Failed to fetch next page", nextResult.exceptionOrNull())
+                break
+            }
+            val nextResponse = nextResult.getOrNull() ?: break
+            allItems.addAll(nextResponse.items)
+            nextLink = nextResponse.nextLink
+        }
+
+        Log.d(TAG, "Fetched ${allItems.size} total items across all pages")
+        return allItems
     }
 
     /**

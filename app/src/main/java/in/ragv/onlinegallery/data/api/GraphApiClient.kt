@@ -130,6 +130,50 @@ class GraphApiClient(private val accessToken: String) {
         }
 
     /**
+     * Fetch a page using a full nextLink URL (for pagination)
+     */
+    suspend fun fetchNextPage(nextLink: String): Result<DriveItemListResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val request = Request.Builder()
+                    .url(nextLink)
+                    .addHeader("Authorization", "Bearer $accessToken")
+                    .addHeader("Accept", "application/json")
+                    .get()
+                    .build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    val body = response.body?.string()
+
+                    if (!response.isSuccessful) {
+                        val errorMessage = if (body != null) {
+                            try {
+                                val error = gson.fromJson(body, GraphErrorResponse::class.java)
+                                error.error.message
+                            } catch (e: Exception) {
+                                body
+                            }
+                        } else {
+                            "HTTP ${response.code}"
+                        }
+                        return@withContext Result.failure(
+                            IOException("Graph API error: $errorMessage")
+                        )
+                    }
+
+                    if (body == null) {
+                        return@withContext Result.failure(IOException("Empty response body"))
+                    }
+
+                    val result = gson.fromJson(body, DriveItemListResponse::class.java)
+                    Result.success(result)
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /**
      * Get a specific item with download URL
      * @param itemId The ID of the item
      * @return Drive item with download URL
