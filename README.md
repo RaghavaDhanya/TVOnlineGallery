@@ -37,12 +37,23 @@ A gallery app for Android TV that streams your photos and videos directly from O
 
 ## TV Remote Controls
 
+**Photos**
+
 | Button | Action |
 |--------|--------|
-| D-pad | Navigate between items |
-| Center | Select / Open |
-| Back | Go back |
-| Play/Pause | Control video playback |
+| D-pad Left/Right | Previous / Next photo |
+| Center | Toggle overlay |
+| Back | Return to grid |
+
+**Videos**
+
+| Button | Action |
+|--------|--------|
+| D-pad Left/Right | Seek backward / forward 10s |
+| D-pad Up/Down | Navigate to previous / next overlay button |
+| Center | Toggle play / pause |
+| Play/Pause | Toggle play / pause |
+| Back | Return to grid |
 
 ## Getting Started
 
