@@ -188,12 +188,35 @@ fun AlbumCard(
                         .crossfade(150) // Fast crossfade for smooth transition
                         .memoryCachePolicy(CachePolicy.ENABLED) // Force memory cache
                         .diskCachePolicy(CachePolicy.ENABLED) // Keep disk cache
+                        // Stable keys keyed off the album id so the bytes are reused across
+                        // sessions even though SharePoint rotates the signed URL each fetch.
+                        .memoryCacheKey(album.id)
+                        .diskCacheKey(album.id)
+                        .listener(
+                            onError = { _, result ->
+                                android.util.Log.w(
+                                    "ThumbnailDebug",
+                                    "AsyncImage FAILED for album '${album.name}' (id=${album.id}) url=${album.thumbnailUrl}",
+                                    result.throwable
+                                )
+                            },
+                            onSuccess = { _, _ ->
+                                android.util.Log.d(
+                                    "ThumbnailDebug",
+                                    "AsyncImage success for album '${album.name}'"
+                                )
+                            }
+                        )
                         .build(),
                     contentDescription = album.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
             } else {
+                android.util.Log.w(
+                    "ThumbnailDebug",
+                    "Rendering GRAY placeholder for album '${album.name}' (id=${album.id}) — thumbnailUrl is null"
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

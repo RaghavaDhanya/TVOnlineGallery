@@ -136,7 +136,12 @@ class OneDriveRepository(context: Context) {
         // First, emit cached data if available
         val cachedAlbums = cacheManager.getCachedAlbums()
         if (cachedAlbums != null && cachedAlbums.isNotEmpty()) {
-            Log.d(TAG, "Emitting ${cachedAlbums.size} cached albums")
+            val nullThumbs = cachedAlbums.count { it.thumbnailUrl == null }
+            Log.d(TAG, "Emitting ${cachedAlbums.size} cached albums ($nullThumbs with null thumbnailUrl)")
+            if (nullThumbs > 0) {
+                val names = cachedAlbums.filter { it.thumbnailUrl == null }.joinToString(", ") { it.name }
+                Log.w("ThumbnailDebug", "CACHED albums with null thumbnailUrl: $names")
+            }
             emit(cachedAlbums)
         }
 
@@ -168,7 +173,7 @@ class OneDriveRepository(context: Context) {
 
             // For each folder, try to get a thumbnail from cached media or API
             val freshAlbums = folders.map { item ->
-                val thumbnailUrl = getAlbumCoverThumbnail(item.id)
+                val thumbnailUrl = getAlbumCoverThumbnail(item.id, item.name)
 
                 Album(
                     id = item.id,
@@ -181,8 +186,12 @@ class OneDriveRepository(context: Context) {
             // Save to cache
             cacheManager.saveAlbums(freshAlbums)
 
-            // Emit fresh data
-            Log.d(TAG, "Emitting ${freshAlbums.size} fresh albums from API")
+            val nullThumbs = freshAlbums.count { it.thumbnailUrl == null }
+            Log.d(TAG, "Emitting ${freshAlbums.size} fresh albums from API ($nullThumbs with null thumbnailUrl)")
+            if (nullThumbs > 0) {
+                val names = freshAlbums.filter { it.thumbnailUrl == null }.joinToString(", ") { it.name }
+                Log.w("ThumbnailDebug", "FRESH albums with null thumbnailUrl: $names")
+            }
             emit(freshAlbums)
         } catch (e: Exception) {
             Log.e(TAG, "Error getting albums", e)
@@ -282,44 +291,60 @@ class OneDriveRepository(context: Context) {
     /**
      * Get a thumbnail for an album cover
      * First tries cached media items, then fetches from API if needed
-     * @param albumId The folder ID
-     * @return Thumbnail URL or null if no media items found
      */
-    private suspend fun getAlbumCoverThumbnail(albumId: String): String? {
-        // First, check cached media items
-        val cachedMedia = cacheManager.getCachedMediaItems(albumId)
-        if (!cachedMedia.isNullOrEmpty()) {
-            val thumbnail = cachedMedia.firstOrNull()?.thumbnailUrl
-            if (thumbnail != null) {
-                Log.d(TAG, "Using cached thumbnail for album $albumId")
-                return thumbnail
-            }
-        }
+    private suspend fun getAlbumCoverThumbnail(albumId: String, albumName: String = ""): String? {
+        val tag = "ThumbnailDebug"
+        Log.d(tag, "[$albumName] resolve start (id=$albumId)")
 
-        // No cached media or no thumbnail, fetch first item from API
+        // Note: we intentionally do NOT short-circuit on cacheManager.getCachedMediaItems() here.
+        // SharePoint thumbnail URLs carry signed `tempauth` JWTs that expire in days/weeks,
+        // so a cached MediaItem.thumbnailUrl is often dead. Always fetch a fresh URL; Coil's
+        // disk cache (keyed by album.id in AlbumCard) keeps the bytes across sessions.
+
         try {
-            val client = graphClient ?: return null
-
-            // Fetch just the first few items to find a media file with thumbnail
-            val result = client.getFolderChildrenById(albumId)
-            if (result.isSuccess) {
-                val items = result.getOrNull()?.items ?: return null
-
-                // Find first media file with a thumbnail
-                val mediaItem = items
-                    .filter { it.file != null && isMediaFile(it) }
-                    .firstOrNull { it.thumbnails?.isNotEmpty() == true }
-
-                val thumbnailUrl = mediaItem?.thumbnails?.firstOrNull()?.large?.url
-                    ?: mediaItem?.thumbnails?.firstOrNull()?.medium?.url
-
-                if (thumbnailUrl != null) {
-                    Log.d(TAG, "Fetched thumbnail from API for album $albumId")
-                }
-                return thumbnailUrl
+            val client = graphClient
+            if (client == null) {
+                Log.w(tag, "[$albumName] graphClient is null, returning null")
+                return null
             }
+
+            val result = client.getFolderChildrenById(albumId)
+            if (result.isFailure) {
+                Log.e(tag, "[$albumName] getFolderChildrenById FAILED", result.exceptionOrNull())
+                return null
+            }
+
+            val response = result.getOrNull()
+            if (response == null) {
+                Log.w(tag, "[$albumName] getFolderChildrenById succeeded but body was null")
+                return null
+            }
+
+            val items = response.items
+            val mediaItems = items.filter { it.file != null && isMediaFile(it) }
+            val mediaWithThumbs = mediaItems.filter { it.thumbnails?.isNotEmpty() == true }
+            Log.d(
+                tag,
+                "[$albumName] API page: total=${items.size}, mediaFiles=${mediaItems.size}, mediaWithThumbnails=${mediaWithThumbs.size}, hasNextPage=${response.nextLink != null}"
+            )
+
+            if (mediaItems.isNotEmpty() && mediaWithThumbs.isEmpty()) {
+                val sample = mediaItems.take(3).joinToString(", ") { "${it.name}(${it.file?.mimeType})" }
+                Log.w(tag, "[$albumName] media files exist but none have thumbnails. Sample: $sample")
+            }
+
+            val mediaItem = mediaWithThumbs.firstOrNull()
+            val thumbnailUrl = mediaItem?.thumbnails?.firstOrNull()?.large?.url
+                ?: mediaItem?.thumbnails?.firstOrNull()?.medium?.url
+
+            if (thumbnailUrl == null) {
+                Log.w(tag, "[$albumName] RETURNING NULL — no usable thumbnail in first page")
+            } else {
+                Log.d(tag, "[$albumName] resolved via API from item '${mediaItem?.name}'")
+            }
+            return thumbnailUrl
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting album cover thumbnail for $albumId", e)
+            Log.e(tag, "[$albumName] exception in getAlbumCoverThumbnail", e)
         }
 
         return null
