@@ -130,6 +130,59 @@ class GraphApiClient(private val accessToken: String) {
         }
 
     /**
+     * Slim listing for album-cover lookup: returns at most [top] items with only the
+     * fields we need to pick a representative thumbnail (id, file, thumbnails).
+     *
+     * The full [getFolderChildrenById] response can be hundreds of KB per folder
+     * (every item × small/medium/large thumbnail URLs of ~2 KB each). On low-RAM
+     * devices the parse + allocation churn across many folders triggers GC stalls
+     * and ANRs. We only need one item with thumbnails to choose a cover, so a
+     * 5-item slim listing suffices.
+     */
+    suspend fun getFirstFolderItems(itemId: String, top: Int = 5): Result<DriveItemListResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val url = "$baseUrl/me/drive/items/$itemId/children?\$top=$top&\$select=id,file,thumbnails&\$expand=thumbnails"
+
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer $accessToken")
+                    .addHeader("Accept", "application/json")
+                    .get()
+                    .build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    val body = response.body?.string()
+
+                    if (!response.isSuccessful) {
+                        val errorMessage = if (body != null) {
+                            try {
+                                val error = gson.fromJson(body, GraphErrorResponse::class.java)
+                                error.error.message
+                            } catch (e: Exception) {
+                                body
+                            }
+                        } else {
+                            "HTTP ${response.code}"
+                        }
+                        return@withContext Result.failure(
+                            IOException("Graph API error: $errorMessage")
+                        )
+                    }
+
+                    if (body == null) {
+                        return@withContext Result.failure(IOException("Empty response body"))
+                    }
+
+                    val result = gson.fromJson(body, DriveItemListResponse::class.java)
+                    Result.success(result)
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /**
      * Fetch a page using a full nextLink URL (for pagination)
      */
     suspend fun fetchNextPage(nextLink: String): Result<DriveItemListResponse> =

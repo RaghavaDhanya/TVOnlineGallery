@@ -9,9 +9,11 @@ import `in`.ragv.onlinegallery.data.auth.AuthManager
 import `in`.ragv.onlinegallery.data.cache.CacheManager
 import `in`.ragv.onlinegallery.data.models.Album
 import `in`.ragv.onlinegallery.data.models.MediaItem
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
 /**
@@ -133,6 +135,16 @@ class OneDriveRepository(context: Context) {
      * Returns a Flow that emits cached data first (if available), then fresh data from API
      */
     fun getAlbums(): Flow<List<Album>> = flow {
+        // DIAGNOSTIC #2: log cache state at the very start of every getAlbums() invocation
+        // so we can tell if a re-trigger (e.g. refreshAlbums on ON_RESUME) is overwriting
+        // a previously good save.
+        val preCheck = cacheManager.getCachedAlbums()
+        Log.w(
+            "ThumbnailDebug",
+            "getAlbums() ENTER — disk cache has ${preCheck?.size ?: 0} albums, " +
+                "${preCheck?.count { it.thumbnailUrl != null } ?: 0} with non-null thumbnailUrl"
+        )
+
         // First, emit cached data if available
         val cachedAlbums = cacheManager.getCachedAlbums()
         if (cachedAlbums != null && cachedAlbums.isNotEmpty()) {
@@ -171,20 +183,37 @@ class OneDriveRepository(context: Context) {
             // Filter for folders only and map to Album objects
             val folders = allItems.filter { it.folder != null }
 
-            // For each folder, try to get a thumbnail from cached media or API
+            // For each folder, try to get a thumbnail from cached media or API.
+            // Fall back to the previously-cached URL on null so a transient resolve
+            // failure can never downgrade a known-good URL.
+            val previousById = cachedAlbums?.associateBy { it.id }.orEmpty()
             val freshAlbums = folders.map { item ->
-                val thumbnailUrl = getAlbumCoverThumbnail(item.id, item.name)
-
+                val resolved = getAlbumCoverThumbnail(item.id, item.name)
+                val carriedOver = previousById[item.id]?.thumbnailUrl
                 Album(
                     id = item.id,
                     name = item.name,
-                    thumbnailUrl = thumbnailUrl,
+                    thumbnailUrl = resolved ?: carriedOver,
                     itemCount = item.folder?.childCount ?: 0
                 )
             }
 
             // Save to cache
+            val freshNonNull = freshAlbums.count { it.thumbnailUrl != null }
+            Log.w(
+                "ThumbnailDebug",
+                "About to saveAlbums: ${freshAlbums.size} albums, $freshNonNull with non-null thumbnailUrl"
+            )
             cacheManager.saveAlbums(freshAlbums)
+
+            // DIAGNOSTIC #1: read back immediately to verify what actually persisted.
+            // If this disagrees with the input, save is silently dropping URLs.
+            val readback = cacheManager.getCachedAlbums()
+            val readbackNonNull = readback?.count { it.thumbnailUrl != null } ?: 0
+            Log.w(
+                "ThumbnailDebug",
+                "POST-saveAlbums readback: ${readback?.size ?: 0} albums, $readbackNonNull with non-null thumbnailUrl"
+            )
 
             val nullThumbs = freshAlbums.count { it.thumbnailUrl == null }
             Log.d(TAG, "Emitting ${freshAlbums.size} fresh albums from API ($nullThumbs with null thumbnailUrl)")
@@ -199,7 +228,7 @@ class OneDriveRepository(context: Context) {
                 emit(emptyList())
             }
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     /**
      * Get media items (photos and videos) from an album
@@ -242,11 +271,12 @@ class OneDriveRepository(context: Context) {
                 .filter { it.file != null && isMediaFile(it) } // Only media files
                 .mapNotNull { item ->
                     // downloadUrl should be included in the response now
-                    val downloadUrl = item.downloadUrl ?: run {
+                    val downloadUrl: String? = if (item.downloadUrl != null) {
+                        item.downloadUrl
+                    } else {
                         // Fallback: fetch individual item (should rarely happen now)
                         Log.w(TAG, "downloadUrl missing for ${item.name}, fetching individually")
-                        val itemResult = client.getItem(item.id)
-                        itemResult.getOrNull()?.downloadUrl
+                        client.getItem(item.id).getOrNull()?.downloadUrl
                     }
 
                     if (downloadUrl == null) {
@@ -277,7 +307,7 @@ class OneDriveRepository(context: Context) {
                 emit(emptyList())
             }
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     /**
      * Sign out and clear credentials
@@ -308,9 +338,12 @@ class OneDriveRepository(context: Context) {
                 return null
             }
 
-            val result = client.getFolderChildrenById(albumId)
+            // Use the slim cover-lookup endpoint (top=5, minimal $select) so we
+            // don't pull a multi-hundred-KB response per folder just to pick a
+            // single thumbnail. Reduces GC pressure dramatically on low-RAM TVs.
+            val result = client.getFirstFolderItems(albumId, top = 5)
             if (result.isFailure) {
-                Log.e(tag, "[$albumName] getFolderChildrenById FAILED", result.exceptionOrNull())
+                Log.e(tag, "[$albumName] getFirstFolderItems FAILED", result.exceptionOrNull())
                 return null
             }
 
@@ -334,8 +367,12 @@ class OneDriveRepository(context: Context) {
             }
 
             val mediaItem = mediaWithThumbs.firstOrNull()
-            val thumbnailUrl = mediaItem?.thumbnails?.firstOrNull()?.large?.url
-                ?: mediaItem?.thumbnails?.firstOrNull()?.medium?.url
+            // Prefer the medium (~176px) thumbnail for album-cover cards. The large
+            // variant is up to 800x800 and decodes to ~2.5MB ARGB bitmaps; with 20+
+            // albums that pins main-thread time on bitmap upload. Medium is plenty
+            // for grid cards and roughly 20x smaller in memory.
+            val thumbnailUrl = mediaItem?.thumbnails?.firstOrNull()?.medium?.url
+                ?: mediaItem?.thumbnails?.firstOrNull()?.large?.url
 
             if (thumbnailUrl == null) {
                 Log.w(tag, "[$albumName] RETURNING NULL — no usable thumbnail in first page")
@@ -343,6 +380,12 @@ class OneDriveRepository(context: Context) {
                 Log.d(tag, "[$albumName] resolved via API from item '${mediaItem?.name}'")
             }
             return thumbnailUrl
+        } catch (e: CancellationException) {
+            // Cooperative cancellation must propagate, otherwise the outer
+            // folders.map keeps running, every remaining call returns null,
+            // and saveAlbums later persists a corrupted (mostly-null) list,
+            // overwriting good cached URLs.
+            throw e
         } catch (e: Exception) {
             Log.e(tag, "[$albumName] exception in getAlbumCoverThumbnail", e)
         }
