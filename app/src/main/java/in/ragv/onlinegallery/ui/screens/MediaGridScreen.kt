@@ -203,22 +203,13 @@ fun MediaCard(
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(mediaItem.thumbnailUrl ?: mediaItem.url)
-                    .crossfade(150) // Fast crossfade for smooth transition
-                    .memoryCachePolicy(CachePolicy.ENABLED) // Force memory cache
-                    .diskCachePolicy(CachePolicy.ENABLED) // Keep disk cache
-                    // Stable keys keyed off the item id so the bytes are reused across
-                    // sessions even though SharePoint rotates the signed URL each fetch.
+                    .crossfade(150)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    // Stable keys keyed off item id so bytes are reused across
+                    // sessions even when the signed URL rotates.
                     .memoryCacheKey(mediaItem.id)
                     .diskCacheKey(mediaItem.id)
-                    .listener(
-                        onError = { _, result ->
-                            android.util.Log.w(
-                                "ThumbnailDebug",
-                                "MediaCard AsyncImage FAILED for '${mediaItem.name}' (id=${mediaItem.id})",
-                                result.throwable
-                            )
-                        }
-                    )
                     .build(),
                 contentDescription = mediaItem.name,
                 modifier = Modifier.fillMaxSize(),

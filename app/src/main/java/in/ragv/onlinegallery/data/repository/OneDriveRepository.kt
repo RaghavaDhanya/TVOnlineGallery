@@ -135,25 +135,10 @@ class OneDriveRepository(context: Context) {
      * Returns a Flow that emits cached data first (if available), then fresh data from API
      */
     fun getAlbums(): Flow<List<Album>> = flow {
-        // DIAGNOSTIC #2: log cache state at the very start of every getAlbums() invocation
-        // so we can tell if a re-trigger (e.g. refreshAlbums on ON_RESUME) is overwriting
-        // a previously good save.
-        val preCheck = cacheManager.getCachedAlbums()
-        Log.w(
-            "ThumbnailDebug",
-            "getAlbums() ENTER — disk cache has ${preCheck?.size ?: 0} albums, " +
-                "${preCheck?.count { it.thumbnailUrl != null } ?: 0} with non-null thumbnailUrl"
-        )
-
         // First, emit cached data if available
         val cachedAlbums = cacheManager.getCachedAlbums()
         if (cachedAlbums != null && cachedAlbums.isNotEmpty()) {
-            val nullThumbs = cachedAlbums.count { it.thumbnailUrl == null }
-            Log.d(TAG, "Emitting ${cachedAlbums.size} cached albums ($nullThumbs with null thumbnailUrl)")
-            if (nullThumbs > 0) {
-                val names = cachedAlbums.filter { it.thumbnailUrl == null }.joinToString(", ") { it.name }
-                Log.w("ThumbnailDebug", "CACHED albums with null thumbnailUrl: $names")
-            }
+            Log.d(TAG, "Emitting ${cachedAlbums.size} cached albums")
             emit(cachedAlbums)
         }
 
@@ -198,29 +183,8 @@ class OneDriveRepository(context: Context) {
                 )
             }
 
-            // Save to cache
-            val freshNonNull = freshAlbums.count { it.thumbnailUrl != null }
-            Log.w(
-                "ThumbnailDebug",
-                "About to saveAlbums: ${freshAlbums.size} albums, $freshNonNull with non-null thumbnailUrl"
-            )
             cacheManager.saveAlbums(freshAlbums)
-
-            // DIAGNOSTIC #1: read back immediately to verify what actually persisted.
-            // If this disagrees with the input, save is silently dropping URLs.
-            val readback = cacheManager.getCachedAlbums()
-            val readbackNonNull = readback?.count { it.thumbnailUrl != null } ?: 0
-            Log.w(
-                "ThumbnailDebug",
-                "POST-saveAlbums readback: ${readback?.size ?: 0} albums, $readbackNonNull with non-null thumbnailUrl"
-            )
-
-            val nullThumbs = freshAlbums.count { it.thumbnailUrl == null }
-            Log.d(TAG, "Emitting ${freshAlbums.size} fresh albums from API ($nullThumbs with null thumbnailUrl)")
-            if (nullThumbs > 0) {
-                val names = freshAlbums.filter { it.thumbnailUrl == null }.joinToString(", ") { it.name }
-                Log.w("ThumbnailDebug", "FRESH albums with null thumbnailUrl: $names")
-            }
+            Log.d(TAG, "Emitting ${freshAlbums.size} fresh albums from API")
             emit(freshAlbums)
         } catch (e: Exception) {
             Log.e(TAG, "Error getting albums", e)
@@ -319,78 +283,36 @@ class OneDriveRepository(context: Context) {
     }
 
     /**
-     * Get a thumbnail for an album cover
-     * First tries cached media items, then fetches from API if needed
+     * Get a thumbnail URL for an album cover by fetching the first few items
+     * in the folder. Always hits the API rather than reusing
+     * cacheManager.getCachedMediaItems(): SharePoint thumbnail URLs carry signed
+     * `tempauth` JWTs that expire in days, so a cached MediaItem.thumbnailUrl is
+     * often dead. Coil's disk cache keyed by album.id keeps the bytes across
+     * sessions, so re-fetching the URL is cheap.
      */
     private suspend fun getAlbumCoverThumbnail(albumId: String, albumName: String = ""): String? {
-        val tag = "ThumbnailDebug"
-        Log.d(tag, "[$albumName] resolve start (id=$albumId)")
-
-        // Note: we intentionally do NOT short-circuit on cacheManager.getCachedMediaItems() here.
-        // SharePoint thumbnail URLs carry signed `tempauth` JWTs that expire in days/weeks,
-        // so a cached MediaItem.thumbnailUrl is often dead. Always fetch a fresh URL; Coil's
-        // disk cache (keyed by album.id in AlbumCard) keeps the bytes across sessions.
-
         try {
-            val client = graphClient
-            if (client == null) {
-                Log.w(tag, "[$albumName] graphClient is null, returning null")
-                return null
-            }
+            val client = graphClient ?: return null
 
-            // Use the slim cover-lookup endpoint (top=5, minimal $select) so we
-            // don't pull a multi-hundred-KB response per folder just to pick a
-            // single thumbnail. Reduces GC pressure dramatically on low-RAM TVs.
             val result = client.getFirstFolderItems(albumId, top = 5)
-            if (result.isFailure) {
-                Log.e(tag, "[$albumName] getFirstFolderItems FAILED", result.exceptionOrNull())
-                return null
-            }
+            val response = result.getOrNull() ?: return null
 
-            val response = result.getOrNull()
-            if (response == null) {
-                Log.w(tag, "[$albumName] getFolderChildrenById succeeded but body was null")
-                return null
-            }
+            val mediaItem = response.items
+                .filter { it.file != null && isMediaFile(it) }
+                .firstOrNull { it.thumbnails?.isNotEmpty() == true }
 
-            val items = response.items
-            val mediaItems = items.filter { it.file != null && isMediaFile(it) }
-            val mediaWithThumbs = mediaItems.filter { it.thumbnails?.isNotEmpty() == true }
-            Log.d(
-                tag,
-                "[$albumName] API page: total=${items.size}, mediaFiles=${mediaItems.size}, mediaWithThumbnails=${mediaWithThumbs.size}, hasNextPage=${response.nextLink != null}"
-            )
-
-            if (mediaItems.isNotEmpty() && mediaWithThumbs.isEmpty()) {
-                val sample = mediaItems.take(3).joinToString(", ") { "${it.name}(${it.file?.mimeType})" }
-                Log.w(tag, "[$albumName] media files exist but none have thumbnails. Sample: $sample")
-            }
-
-            val mediaItem = mediaWithThumbs.firstOrNull()
-            // Prefer the medium (~176px) thumbnail for album-cover cards. The large
-            // variant is up to 800x800 and decodes to ~2.5MB ARGB bitmaps; with 20+
-            // albums that pins main-thread time on bitmap upload. Medium is plenty
-            // for grid cards and roughly 20x smaller in memory.
-            val thumbnailUrl = mediaItem?.thumbnails?.firstOrNull()?.medium?.url
-                ?: mediaItem?.thumbnails?.firstOrNull()?.large?.url
-
-            if (thumbnailUrl == null) {
-                Log.w(tag, "[$albumName] RETURNING NULL — no usable thumbnail in first page")
-            } else {
-                Log.d(tag, "[$albumName] resolved via API from item '${mediaItem?.name}'")
-            }
-            return thumbnailUrl
+            return mediaItem?.thumbnails?.firstOrNull()?.large?.url
+                ?: mediaItem?.thumbnails?.firstOrNull()?.medium?.url
         } catch (e: CancellationException) {
-            // Cooperative cancellation must propagate, otherwise the outer
+            // Cooperative cancellation must propagate. Otherwise the outer
             // folders.map keeps running, every remaining call returns null,
-            // and saveAlbums later persists a corrupted (mostly-null) list,
+            // and saveAlbums then persists a corrupted (mostly-null) list,
             // overwriting good cached URLs.
             throw e
         } catch (e: Exception) {
-            Log.e(tag, "[$albumName] exception in getAlbumCoverThumbnail", e)
+            Log.e(TAG, "Error resolving cover thumbnail for '$albumName' ($albumId)", e)
+            return null
         }
-
-        return null
     }
 
     /**
